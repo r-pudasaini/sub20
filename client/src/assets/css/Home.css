@@ -1,0 +1,31 @@
+
+.home-logo {
+  color : var(--vim-red);
+  font-size : 200px;
+  margin-top : 3rem;
+  margin-bottom : 7rem;
+}
+
+.home-button-row {
+  margin-bottom : 4rem;
+}
+
+.home-how-to-play-button {
+  background-color: limegreen;
+  color : white;
+  border-radius : 15px;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+  padding : 0.5rem 1rem;
+  font-size: 21px;
+  margin-right : 5rem;
+}
+
+.home-start-game-button {
+  background-color: #ed474a;
+  color : white;
+  padding : 0.5rem 1rem;
+  border-radius : 15px;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+  font-size: 21px;
+  margin-left: 5rem;
+}
