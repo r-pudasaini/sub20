@@ -6,8 +6,6 @@ import MoonLoader from 'react-spinners/MoonLoader'
 
 function Game() {
 
-  // TODO: make a buffering GIF right here
-
   return (
     <div className='margin-top flex-col center-contents-vertical'>
 
