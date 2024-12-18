@@ -27,22 +27,16 @@ const mimeType = {
     '.ttf': 'application/font-sfnt'
 }; 
 
-http.createServer( (req, res) => { 
-    console.log(`${req.method} ${req.url}`);
+http.createServer((req, res) => { 
 
     const parsedUrl = url.parse(req.url);
 
-    // extract URL path
-    // Avoid https://en.wikipedia.org/wiki/Directory_traversal_attack
-    // e.g curl --path-as-is http://localhost:9000/../fileInDanger.txt
-    // by limiting the path to current directory only
-    const sanitizePath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
-    let pathname = path.join("../webapp/", sanitizePath);
-  
-    fs.exists(pathname, function (exist) {
+    // avoids directory traversal attacks
+    const sanitizedPath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
+    let pathname = path.join("../webapp/", sanitizedPath);
 
-      if(!exist) {
-        // if the file is not found, return 404
+    if (!fs.existsSync(pathname))
+    {
         res.statusCode = 404;
         fs.readFile("../webapp/index.html", function(err, data) {
             if (err)
@@ -52,32 +46,31 @@ http.createServer( (req, res) => {
             }
             else
             {
+                // supports client-side routing, which we use in the front
                 res.setHeader('Content-type', 'text/html')
                 res.end(data)
             }
         })
         return;
-      }
+    }
   
-      // if is a directory, then look for index.html
-      if (fs.statSync(pathname).isDirectory()) {
+    // if is a directory, then serve index.html
+    if (fs.statSync(pathname).isDirectory()) {
         pathname += '/index.html';
-      }
+    }
   
-      // read file from file system
-      fs.readFile(pathname, function(err, data){
+    // send the file they want
+    fs.readFile(pathname, function(err, data){
         if(err){
-          res.statusCode = 500;
-          res.end(`Error getting the file: ${err}.`);
+            res.statusCode = 500;
+            res.end(`Error getting the file: ${err}.`);
         } else {
-          // based on the URL path, extract the file extention. e.g. .js, .doc, ...
-          const ext = path.parse(pathname).ext;
-          // if the file is found, set Content-type and send data
-          res.setHeader('Content-type', mimeType[ext] || 'text/html' );
-          res.end(data);
+            const ext = path.parse(pathname).ext;
+            res.setHeader('Content-type', mimeType[ext] || 'text/html' );
+            res.end(data);
         }
-      });
-    }); 
-}).listen(PORT); 
+    });
 
-console.log("Listening on port 10201")
+}).listen(parseInt(PORT));
+
+console.log(`Listening on port ${PORT}`)
