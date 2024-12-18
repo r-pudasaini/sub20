@@ -28,5 +28,56 @@ const mimeType = {
 }; 
 
 http.createServer( (req, res) => { 
+    console.log(`${req.method} ${req.url}`);
+
+    const parsedUrl = url.parse(req.url);
+
+    // extract URL path
+    // Avoid https://en.wikipedia.org/wiki/Directory_traversal_attack
+    // e.g curl --path-as-is http://localhost:9000/../fileInDanger.txt
+    // by limiting the path to current directory only
+    const sanitizePath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
+    let pathname = path.join("../webapp/", sanitizePath);
   
+    fs.exists(pathname, function (exist) {
+
+      if(!exist) {
+        // if the file is not found, return 404
+        res.statusCode = 404;
+        fs.readFile("../webapp/index.html", function(err, data) {
+            if (err)
+            {
+                res.end(`File ${pathname} not found!`);
+                return;
+            }
+            else
+            {
+                res.setHeader('Content-type', 'text/html')
+                res.end(data)
+            }
+        })
+        return;
+      }
+  
+      // if is a directory, then look for index.html
+      if (fs.statSync(pathname).isDirectory()) {
+        pathname += '/index.html';
+      }
+  
+      // read file from file system
+      fs.readFile(pathname, function(err, data){
+        if(err){
+          res.statusCode = 500;
+          res.end(`Error getting the file: ${err}.`);
+        } else {
+          // based on the URL path, extract the file extention. e.g. .js, .doc, ...
+          const ext = path.parse(pathname).ext;
+          // if the file is found, set Content-type and send data
+          res.setHeader('Content-type', mimeType[ext] || 'text/html' );
+          res.end(data);
+        }
+      });
+    }); 
 }).listen(PORT); 
+
+console.log("Listening on port 10201")
