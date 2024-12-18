@@ -2,6 +2,7 @@
 .home-logo {
   color : var(--vim-red);
   font-size : 200px;
+  text-align: center;
   margin-top : 3rem;
   margin-bottom : 7rem;
 }

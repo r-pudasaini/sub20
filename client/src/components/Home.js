@@ -1,12 +1,29 @@
-import React from 'react'
-import {Link} from 'react-router-dom'
+import React, { useContext, useState } from 'react'
+import {useNavigate} from 'react-router-dom'
 import '../assets/css/global.css'
 import '../assets/css/Home.css'
+import How2PlayPopup from './HowToPlayPopup'
+import LoginPopup from './LoginPopup'
+import { Login } from '../contexts/LoginContext'
 
 function Home() {
 
-  const how2PlayPopup = () => {
-    // TODO: display the how to play popUp by invoking this function. 
+  const [how2playPopup, setHow2PlayPopup] = useState(false)
+  const [loginPopup, setLoginPopup] = useState(false)
+
+  const {isLoggedIn} = useContext(Login)
+  const navigate = useNavigate()
+
+  const handleStartGameClick = () => {
+  
+    if (isLoggedIn)
+    {
+      navigate('/start-game')
+    }
+    else
+    {
+      setLoginPopup(true) // prompt the user to log in
+    }
   }
 
   return (
@@ -20,23 +37,26 @@ function Home() {
 
         <div 
           className="home-how-to-play-button unselectable jersey-15-regular button"
-          onClick={how2PlayPopup}
+          onClick={() => setHow2PlayPopup(true)}
         >
           How to Play?
         </div>
 
-        <Link 
-          to="start-game" 
+        <div
           className="home-start-game-button unselectable jersey-15-regular button"
+          onClick={handleStartGameClick}
         >
           Find Me a Game
-        </Link>
+          {/*
+            TODO: when we have support for google authentication, make the button say "Login to Play" if not signed in, 
+            and "Find me a Game if we are signed in."
+          */}
+        </div>
 
       </div>
 
-      <div>
-
-      </div>
+      <How2PlayPopup isActive={how2playPopup} setState={setHow2PlayPopup} />
+      <LoginPopup isActive={loginPopup} setState={setLoginPopup} />
 
     </div>
   )
