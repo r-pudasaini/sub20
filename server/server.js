@@ -33,6 +33,21 @@ http.createServer((req, res) => {
 
     // avoids directory traversal attacks
     const sanitizedPath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
+
+    if (sanitizedPath === "/api/verify-login")
+    {
+        res.statusCode = 200
+        res.setHeader('Content-type', 'text/html')
+        res.end("In the API verification endpoint")
+        return;
+
+        // TODO: here, we will verify the client through the cookie they sent. 
+        // we should be looking at the 'auth-token' cookie
+        // if they did not provide the cookie we wanted, or the cookie is invalid, we will return a 401
+        // if they do provide the cookie, we return a 200 response along with a 
+    }
+
+
     let pathname = path.join("../webapp/", sanitizedPath);
 
     if (!fs.existsSync(pathname))

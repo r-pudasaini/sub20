@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import '../assets/css/global.css'
 import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
+import axios from 'axios'
 
 function Game() {
 
@@ -19,6 +20,17 @@ function Game() {
 
     // if the user does not belong to a chatroom, they will be placed into a Queue until another player joins the room with them. 
     // when a partner player is found, the user will be directed to the chatroom page. 
+
+    axios.get('/api/verify-login').then((response) => {
+
+      console.log(response.data)
+
+    }).catch((error) => {
+
+      console.log(error)
+      // depending on the error we got, we will navigate to the error page. 
+    })
+
 
 
   }, [])
