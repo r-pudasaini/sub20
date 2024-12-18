@@ -19,14 +19,14 @@ function LoginPopup({isActive, setState}) {
 
     try {
       const result = await signInWithPopup(auth, provider)
-      cookies.set("auth-token", result.user.refreshToken)
+      const token = await result.user.getIdToken();
+      cookies.set("auth-token", token)
       changeLogin(true)
       setState(false)
       navigate('/start-game')
 
     } catch (error) {
       console.error(error)
-      // TODO: create a react toast that notifies the user that an error occurred. 
       toast.error('Failed to sign in. Please try again later.')
     }
   }

@@ -1,19 +1,29 @@
-import React, { useContext } from 'react'
+import React, { useEffect } from 'react'
 import '../assets/css/global.css'
 import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
-import { Login } from '../contexts/LoginContext'
-import GameRedirect from './GameRedirect'
 
 function Game() {
 
-  // TODO: make sure the login value is not false 
-  // if it is false, then we need to display that they must be logged in 
-  // to play the game, and they'll be re-directed to the home page after a 3-5 second delay
+  useEffect(() => {
 
-  const {isLoggedIn} = useContext(Login)
+    // here, we will make a request to the server for a game room resource. 
+    // the server will authenticate the request iff we are logged in, and the auth-token cookie is a valid firebase JWT 
+    // the server will give a 401 if there wasn't such a cookie or if the cookie was invalid,
+    // and we will handle the 401 by navigating to the Error Page and displaying the according error message. 
 
-  return (isLoggedIn) ? (
+    // the server will respond with 200 OK, and the chat room id of the current player if they are logged in. This chat room id must be saved 
+    // as a cookie. 
+
+    // if the user already belongs to a chatroom, they will be directed to a page with the messages of their chat-room open 
+
+    // if the user does not belong to a chatroom, they will be placed into a Queue until another player joins the room with them. 
+    // when a partner player is found, the user will be directed to the chatroom page. 
+
+
+  }, [])
+
+  return (
     <div className='margin-top flex-col center-contents-vertical'>
 
       <div className='game-buffering'>
@@ -29,8 +39,6 @@ function Game() {
       </div>
 
     </div>
-  ) : (
-    <GameRedirect />
   )
 }
 

@@ -1,7 +1,7 @@
 import './assets/css/global.css'
 import Home from './components/Home'
 import Game from './components/Game'
-import NotFound from './components/NotFound'
+import ErrorPage from './components/ErrorPage'
 import 'react-toastify/dist/ReactToastify.css'
 import {Flip, ToastContainer} from 'react-toastify'
 
@@ -18,7 +18,10 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/start-game" element={<Game />} />
-        <Route path="*" element={<NotFound />} />
+        <Route path="/error" element={<ErrorPage />}>
+          <Route path=":code" element={<ErrorPage />} />
+        </Route>
+        <Route path="*" element={<ErrorPage />}/>
       </Routes>
       <ToastContainer
         position="bottom-right"

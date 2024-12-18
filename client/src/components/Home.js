@@ -1,28 +1,28 @@
-import React, { useContext, useState } from 'react'
+import React, { useState } from 'react'
 import {useNavigate} from 'react-router-dom'
 import '../assets/css/global.css'
 import '../assets/css/Home.css'
 import How2PlayPopup from './HowToPlayPopup'
 import LoginPopup from './LoginPopup'
-import { Login } from '../contexts/LoginContext'
+import Cookies from 'universal-cookie'
 
 function Home() {
 
   const [how2playPopup, setHow2PlayPopup] = useState(false)
   const [loginPopup, setLoginPopup] = useState(false)
 
-  const {isLoggedIn} = useContext(Login)
   const navigate = useNavigate()
+  const cookies = new Cookies()
 
   const handleStartGameClick = () => {
-  
-    if (isLoggedIn)
+
+    if (typeof(cookies.get('auth-token')) === "undefined")
     {
-      navigate('/start-game')
+      setLoginPopup(true) // prompt the user to log in
     }
     else
     {
-      setLoginPopup(true) // prompt the user to log in
+      navigate('/start-game')
     }
   }
 
