@@ -1,91 +1,56 @@
-// Importing necessary modules 
-const http = require('http'); 
-const url = require('url'); 
-const fs = require('fs'); 
-const path = require('path'); 
-   
-// Port on which the server will create 
-const PORT = 10201; 
-   
-// Maps file extension to MIME types which 
-// helps the browser to understand what to 
-// do with the file 
-const mimeType = { 
-    '.ico': 'image/x-icon', 
-    '.html': 'text/html', 
-    '.js': 'text/javascript', 
-    '.json': 'application/json', 
-    '.css': 'text/css', 
-    '.png': 'image/png', 
-    '.jpg': 'image/jpeg', 
-    '.wav': 'audio/wav', 
-    '.mp3': 'audio/mpeg', 
-    '.svg': 'image/svg+xml', 
-    '.pdf': 'application/pdf', 
-    '.doc': 'application/msword', 
-    '.eot': 'application/vnd.ms-fontobject', 
-    '.ttf': 'application/font-sfnt'
-}; 
 
-http.createServer((req, res) => { 
+const express = require('express')
+const cookieParser = require('cookie-parser')
 
-    const parsedUrl = url.parse(req.url);
+const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth')
 
-    // avoids directory traversal attacks
-    const sanitizedPath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
+const app = express()
+const port = 10201
 
-    if (sanitizedPath === "/api/verify-login")
-    {
-        res.statusCode = 200
-        res.setHeader('Content-type', 'text/html')
-        res.end("In the API verification endpoint")
-        return;
+//import { initializeApp } from "firebase-admin/app";
+//import { getAuth } from "firebase-admin/auth";
 
-        // TODO: here, we will verify the client through the cookie they sent. 
-        // we should be looking at the 'auth-token' cookie
-        // if they did not provide the cookie we wanted, or the cookie is invalid, we will return a 401
-        // if they do provide the cookie, we return a 200 response along with a 
-    }
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
 
+const fApp = initializeApp(firebaseConfig);
+const auth = getAuth(fApp);
 
-    let pathname = path.join("../webapp/", sanitizedPath);
+app.use(cookieParser())
+app.use(express.static('../webapp'))
 
-    if (!fs.existsSync(pathname))
-    {
-        res.statusCode = 404;
-        fs.readFile("../webapp/index.html", function(err, data) {
-            if (err)
-            {
-                res.end(`File ${pathname} not found!`);
-                return;
-            }
-            else
-            {
-                // supports client-side routing, which we use in the front
-                res.setHeader('Content-type', 'text/html')
-                res.end(data)
-            }
-        })
-        return;
-    }
+app.get('/api/verify-login', (req, res) => {
+
+  if (typeof(req.cookies.auth_token) === "undefined")
+  {
+    res.statusCode = 401
+    res.send("Authentication failed: missing auth token cookie")
+    return
+  }
+
+  auth.verifyIdToken(req.cookies.auth_token).then((decoded) => {
+    res.statusCode = 200
+    res.send("Valid token given")
+
+  }).catch((error) => {
+    res.statusCode = 401
+    res.send(`Authentication failed: ${error}`)
+  })
   
-    // if is a directory, then serve index.html
-    if (fs.statSync(pathname).isDirectory()) {
-        pathname += '/index.html';
-    }
-  
-    // send the file they want
-    fs.readFile(pathname, function(err, data){
-        if(err){
-            res.statusCode = 500;
-            res.end(`Error getting the file: ${err}.`);
-        } else {
-            const ext = path.parse(pathname).ext;
-            res.setHeader('Content-type', mimeType[ext] || 'text/html' );
-            res.end(data);
-        }
-    });
+})
 
-}).listen(parseInt(PORT));
+// redirect 404 errors to the client
+app.use((req, res, next) => { 
+  res.status(404).sendFile('index.html', {root: '../webapp/'})
+}) 
 
-console.log(`Listening on port ${PORT}`)
+app.listen(port, () => {
+  console.log(`listening on port ${port}`)
+})

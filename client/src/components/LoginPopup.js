@@ -20,7 +20,7 @@ function LoginPopup({isActive, setState}) {
     try {
       const result = await signInWithPopup(auth, provider)
       const token = await result.user.getIdToken();
-      cookies.set("auth-token", token)
+      cookies.set("auth_token", token)
       changeLogin(true)
       setState(false)
       navigate('/start-game')
