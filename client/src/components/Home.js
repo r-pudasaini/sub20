@@ -16,7 +16,7 @@ function Home() {
 
   const handleStartGameClick = () => {
 
-    if (typeof(cookies.get('auth-token')) === "undefined")
+    if (typeof(cookies.get('auth_token')) === "undefined")
     {
       setLoginPopup(true) // prompt the user to log in
     }

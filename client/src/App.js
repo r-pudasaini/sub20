@@ -2,6 +2,7 @@ import './assets/css/global.css'
 import Home from './components/Home'
 import Game from './components/Game'
 import ErrorPage from './components/ErrorPage'
+import Chat from './components/Chat'
 import 'react-toastify/dist/ReactToastify.css'
 import {Flip, ToastContainer} from 'react-toastify'
 
@@ -18,6 +19,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/start-game" element={<Game />} />
+        <Route path='/chat-page' element={<Chat />} />
         <Route path="/error" element={<ErrorPage />}>
           <Route path=":code" element={<ErrorPage />} />
         </Route>

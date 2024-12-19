@@ -7,8 +7,8 @@
 
 body {
   background-color: var(--background-color);
+  color : white;
 }
-
 
 .center-text {
   text-align: center;

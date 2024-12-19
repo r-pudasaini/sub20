@@ -2,9 +2,13 @@ import React, { useEffect } from 'react'
 import '../assets/css/global.css'
 import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
+import {useNavigate} from 'react-router-dom'
 import axios from 'axios'
+import { toast } from 'react-toastify'
 
 function Game() {
+
+  const navigate = useNavigate()
 
   useEffect(() => {
 
@@ -23,15 +27,21 @@ function Game() {
 
     axios.get('/api/verify-login').then((response) => {
 
-      console.log(response.data)
+      navigate('/chat-page')
 
     }).catch((error) => {
 
-      console.log(error)
-      // depending on the error we got, we will navigate to the error page. 
+      if (error.status >= 400 && error.status <= 499)
+      {
+        navigate(`/error/${error.status}`)
+      }
+      else
+      {
+        toast.error("Failed to connect. Please try again later")
+        navigate('/')
+      }
+
     })
-
-
 
   }, [])
 
