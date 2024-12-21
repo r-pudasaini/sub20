@@ -5,6 +5,7 @@ import MoonLoader from 'react-spinners/MoonLoader'
 import {useNavigate} from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { cookies } from './Home'
 
 function Game() {
 
@@ -33,6 +34,7 @@ function Game() {
 
       if (error.status >= 400 && error.status <= 499)
       {
+        cookies.remove('auth_token')
         navigate(`/error/${error.status}`)
       }
       else

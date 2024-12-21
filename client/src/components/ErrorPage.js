@@ -5,7 +5,7 @@ import { useNavigate, Link, useParams } from 'react-router-dom'
 
 const codes2message = {
   "" : "Page Not Found\n",
-  "401" : "Attempt to access chat room without authentication\n",
+  "401" : "Attempt to access chat room without authentication. Please log in and try again\n",
   "403" : "Attempt to access chat room without valid permissions\n",
   "404" : "Page Not found\n",
 }

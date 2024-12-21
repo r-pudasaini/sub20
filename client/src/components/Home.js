@@ -3,26 +3,46 @@ import {useNavigate} from 'react-router-dom'
 import '../assets/css/global.css'
 import '../assets/css/Home.css'
 import How2PlayPopup from './HowToPlayPopup'
-import LoginPopup from './LoginPopup'
 import Cookies from 'universal-cookie'
+import {signInWithPopup} from 'firebase/auth'
+import {toast} from 'react-toastify'
+import {auth, provider} from '../firebase-config'
+
+export const cookies = new Cookies()
 
 function Home() {
 
   const [how2playPopup, setHow2PlayPopup] = useState(false)
-  const [loginPopup, setLoginPopup] = useState(false)
 
   const navigate = useNavigate()
-  const cookies = new Cookies()
+
+  const handleLogin = async () => {
+
+    if (typeof(cookies.get("auth_token")) !== "undefined")
+    {
+      toast.error("You are already Logged in!")
+      return
+    }
+
+    try {
+      const result = await signInWithPopup(auth, provider)
+      const token = await result.user.getIdToken();
+      cookies.set("auth_token", token)
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to sign in. Please try again later.')
+    }
+  }
 
   const handleStartGameClick = () => {
 
-    if (typeof(cookies.get('auth_token')) === "undefined")
+    if (typeof(cookies.get("auth_token")) === "undefined")
     {
-      setLoginPopup(true) // prompt the user to log in
+      toast.error('Must be logged in to play.')
     }
     else
     {
-      navigate('/start-game')
+      navigate('start-game')
     }
   }
 
@@ -42,21 +62,31 @@ function Home() {
           How to Play?
         </div>
 
+        <div 
+          className="home-login-button unselectable button"
+          onClick={handleLogin}
+        >
+          <img
+            src={require('../assets/images/light-sign-in.png')}
+            width="200px"
+            height="auto"
+            alt='Google Sign In button'
+          />
+        </div>
+
+
+      </div>
+
+      <div className="home-button-row">
         <div
           className="home-start-game-button unselectable jersey-15-regular button"
           onClick={handleStartGameClick}
         >
           Find Me a Game
-          {/*
-            TODO: when we have support for google authentication, make the button say "Login to Play" if not signed in, 
-            and "Find me a Game if we are signed in."
-          */}
         </div>
-
       </div>
 
       <How2PlayPopup isActive={how2playPopup} setState={setHow2PlayPopup} />
-      <LoginPopup isActive={loginPopup} setState={setLoginPopup} />
 
     </div>
   )
