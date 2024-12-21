@@ -1,15 +1,17 @@
 
 const express = require('express')
+const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 
-const { initializeApp } = require('firebase-admin/app');
+const { initializeApp, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth')
+const { getFirestore } = require('firebase-admin/firestore')
+const serviceAccount = require('./private_key.json');
+const { credential } = require('firebase-admin');
 
 const app = express()
 const port = 10201
-
-//import { initializeApp } from "firebase-admin/app";
-//import { getAuth } from "firebase-admin/auth";
+const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
@@ -17,24 +19,22 @@ const firebaseConfig = {
   projectId: process.env.FIREBASE_PROJECT_ID,
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
+  appId: process.env.FIREBASE_APP_ID,
+  credential : cert(serviceAccount)
 };
 
 const fApp = initializeApp(firebaseConfig);
 const auth = getAuth(fApp);
+const db = getFirestore(fApp)
 
 app.use(cookieParser())
 app.use(express.static('../webapp'))
 
-app.get('/api/get-chatroom', (req, res) => {
+app.get('/api/get-chatroom-messages', (req, res) => {
 
-  // TODO: here the user should supply the chat information they were given from earlier. 
-  // this will allow us to search the chatroom by its ID, and verify the person requesting the chat-room's messages 
-  // are indeed authorized to view that chat. 
-
-  // if they do not provide the chat information as a cookie, or the information is invalid, then 
-  // we will just look up the email of the user in the DB, and if the email is part of a valid chat-room, then 
-  // we will return information about their chat-room, just as we would in '/api/verify-login/'
+  // again, using the auth-token the client provides, we will look up the email of the user
+  // in the DB, and find which chatroom they belong to. This endpoint will first send all the messages in the 
+  // chatroom to the user, and steadily send new messages to the user, as they appear from their partner, as snapshots. 
 
   // if the client is not part of a chatroom, we will return 403 
 
@@ -44,8 +44,43 @@ app.get('/api/get-chatroom', (req, res) => {
   res.send("Chat rooms not implemented yet.")
 })
 
+/*
+  Adds a messages send from the user (who we verify by examining their auth-token header)
+*/
+app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
-app.get('/api/verify-login', (req, res) => {
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
+
+    const message2send = req.body.message
+    const messagesRef = db.collection("chat-room/")
+
+    // TODO: in the path right here, we would replace all that gibberish with the ID of the chatroom the 
+    // authenticated user belongs to. If they do not belong to a chatroom, we'd throw a 403. 
+
+    // we would ALSO verify the message the client wants to send (the one they provided) is a valid message. 
+    // i.e. it is:
+    //    - a string literal
+    //    - is one word (no whitespaces or equivalent)
+    //    - is not equal to any other message sent already 
+    //    - the chatroom is not expired (either in time or number of messages)
+
+    await messagesRef.add({
+      text: message2send,
+      user: decoded.email,
+    })
+
+    res.statusCode = 200
+    res.send("Message Recieved")
+
+  }).catch((error) => {
+    res.statusCode = 401
+    res.send(`Authentication failed: ${error}`)
+  })
+
+})
+
+
+app.get('/api/start-game', (req, res) => {
 
   if (typeof(req.cookies.auth_token) === "undefined")
   {
@@ -56,14 +91,14 @@ app.get('/api/verify-login', (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then((decoded) => {
     res.statusCode = 200
+
     
     /*
       TODO: this is where things get a bit complicated. 
       we now have the information of the user that requested entry into our game. 
 
       so what will we do? we need to check our database to see if a user with the email provided in the token already 
-      exists in a chatroom. If they do, then we will respond with the room number of that chatroom, and all the messages that have been sent 
-      in the chatroom thus far. 
+      exists in a chatroom. If they do, then we will respond with the room number of that chatroom, and the time when the chatroom expires. 
 
       If the user is NOT part of a game room, then they need to be added into a queue until another non-DB user attempts to log in.
       If the queue already has a user that's waiting, then we need to create a DB Chatroom entry that will have a foreign key pointing 

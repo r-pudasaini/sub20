@@ -6,3 +6,4 @@ Cargo.lock
 /server/package-lock.json
 /server/firebase-config.js
 /server/.env
+/server/private_key.json
