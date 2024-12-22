@@ -7,8 +7,6 @@ import axios from "axios";
 
 function Chat() {
 
-  //const [messages, setMessages] = useState([])
-
   // TODO: response will have the most recent chat messages, we will display these
   // as the game progresses. 
 
@@ -17,10 +15,23 @@ function Chat() {
   // when a user is logged in and authenticated, they will recieve live updates from the server regarding the 
   // state of the chat-room the client is in. These messages will be properly rendered for the user, by us (client code)
 
-  // so we can encapsulate all the document-related logic on the server, and let the client only send messages it wants the server to 
-  // have through some api endpoint, and recieve messages from another api endpoint. 
-
   const [message, setMessage] = useState("")
+  //const [messages, setMessages] = useState([])
+
+  useEffect(() => {
+
+    const eventSource = new EventSource('/api/get-chatroom-messages')
+    eventSource.onmessage = (event) => {
+      console.log(event.data)
+    };
+
+    return () => {
+      eventSource.close();
+    };
+
+  }, [])
+
+  const [messages, setMessages] = useState([])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -33,8 +44,6 @@ function Chat() {
       toast.error("Invalid Message Given")
       return
     }
-
-    console.log(message)
 
     axios.post('/api/send-chatroom-message', {message}).then((response) => {
 
@@ -57,6 +66,12 @@ function Chat() {
 
   return (
     <div className="center-contents-horizontal center-contents-vertical flex-col margin-top chat-container">
+
+      <div className="chat-message-window flex-col">
+
+
+
+      </div>
 
       <form 
         className="chat-form flex-col"

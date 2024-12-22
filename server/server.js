@@ -30,18 +30,71 @@ const db = getFirestore(fApp)
 app.use(cookieParser())
 app.use(express.static('../webapp'))
 
+// !!!TEMPORARY!!!
+// !!!REMOVE THIS FROM PRODUCTION BUILD!!!
+app.all('/', function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "X-Requested-With");
+  next();
+});
+
 app.get('/api/get-chatroom-messages', (req, res) => {
 
-  // again, using the auth-token the client provides, we will look up the email of the user
+  //res.writeHead(200, {
+  //  'Content-Type': 'text/event-stream',
+  //  'Cache-Control': 'no-cache',
+  //  'Connection': 'keep-alive',
+  //});
+
+  //// Send SSE events
+  //setInterval(() => {
+  //  const eventData = `data: ${new Date().toLocaleTimeString()}\n\n`;
+  //  res.write(eventData);
+  //}, 1000);
+
+  if (typeof(req.cookies.auth_token) === "undefined")
+  {
+    res.statusCode = 401
+    res.send("Authentication failed: missing auth token cookie")
+    return
+  }
+
+  // TODO: using the auth-token the client provides, we will look up the email of the user
   // in the DB, and find which chatroom they belong to. This endpoint will first send all the messages in the 
   // chatroom to the user, and steadily send new messages to the user, as they appear from their partner, as snapshots. 
 
-  // if the client is not part of a chatroom, we will return 403 
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-  // if the client's auth token is missing or invalid, we will return 401. 
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
 
-  res.statusCode = 403 
-  res.send("Chat rooms not implemented yet.")
+    db.collection("chat-room/mock-chat-room/messages").onSnapshot((snapshot) => {
+
+      let send_to = []
+
+      snapshot.forEach((data) => {
+        send_to.push({
+          "text":data.get("text"),
+          "time":data.get("time"),
+          "user":data.get("user")
+        })
+      })
+
+      const toSend = `${JSON.stringify(send_to)}\n\n`
+      res.write(toSend)
+
+    })
+
+  }).catch((error) => {
+    res.statusCode = 401
+    res.send(`Authentication Failed: ${error}`)
+  })
+
+
+
 })
 
 /*
@@ -49,28 +102,37 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 */
 app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
+  if (typeof(req.cookies.auth_token) === "undefined")
+  {
+    res.statusCode = 401
+    res.send("Authentication failed: missing auth token cookie")
+    return
+  }
+
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
     const message2send = req.body.message
-    const messagesRef = db.collection("chat-room/")
 
-    // TODO: in the path right here, we would replace all that gibberish with the ID of the chatroom the 
-    // authenticated user belongs to. If they do not belong to a chatroom, we'd throw a 403. 
-
-    // we would ALSO verify the message the client wants to send (the one they provided) is a valid message. 
-    // i.e. it is:
+    // TODO: create a function that will verify message2send. We need to make sure it is:
     //    - a string literal
     //    - is one word (no whitespaces or equivalent)
     //    - is not equal to any other message sent already 
     //    - the chatroom is not expired (either in time or number of messages)
 
+
+
+    const messagesRef = db.collection("chat-room/mock-chat-room/messages")
+      // in a more completed implementation, dev-chat-room would instead be the chat room that the current player is assigned to
+      // if the current player is assigned to no chat room at all, then we send them a 403 error
+
     await messagesRef.add({
       text: message2send,
       user: decoded.email,
+      time: Date.now()
     })
 
     res.statusCode = 200
-    res.send("Message Recieved")
+    res.send("")
 
   }).catch((error) => {
     res.statusCode = 401
