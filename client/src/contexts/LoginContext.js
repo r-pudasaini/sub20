@@ -12,7 +12,6 @@ function LoginContext ({children}) {
 
   const [loginCookie, setLoginCookie] = useState(cookies.get("auth_token"))
 
-
   useEffect(() => {
 
     if (!loginCookie)

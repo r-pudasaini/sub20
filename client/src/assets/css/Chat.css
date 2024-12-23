@@ -59,6 +59,7 @@
 .chat-form input {
   flex-grow: 1;
   border-radius: 10px 0 0px 10px;
+  outline: none;
 }
 
 .chat-form button {

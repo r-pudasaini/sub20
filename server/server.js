@@ -107,6 +107,26 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 */
 app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
+
+  const isValidMessage = (str) => {
+
+    // one word, non-empty, a non-duplicate, ascii chars only.
+
+    if (typeof(str) === "undefined" || str === "")
+    {
+      return "Error: Message must not be empty";
+    }
+
+    if (!(/^[a-zA-Z]+$/.test(str)))
+    {
+      return "Error: Invalid Character Detected in Message";
+    }
+
+
+    // TODO: check if str is the same as a message already sent. 
+
+  }
+
   if (typeof(req.cookies.auth_token) === "undefined")
   {
     res.statusCode = 401
@@ -118,13 +138,14 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     const message2send = req.body.message
 
-    // TODO: create a function that will verify message2send. We need to make sure it is:
-    //    - a string literal
-    //    - is one word (no whitespaces or equivalent)
-    //    - is not equal to any other message sent already 
-    //    - the chatroom is not expired (either in time or number of messages)
+    const errorMessage = isValidMessage(message2send)
 
-
+    if (errorMessage)
+    {
+      res.statusCode = 400
+      res.send(errorMessage)
+      return
+    }
 
     const messagesRef = db.collection("chat-room/mock-chat-room/messages")
       // in a more completed implementation, dev-chat-room would instead be the chat room that the current player is assigned to
