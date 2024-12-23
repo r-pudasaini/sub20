@@ -7,7 +7,7 @@ const { initializeApp, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore } = require('firebase-admin/firestore')
 const serviceAccount = require('./private_key.json');
-const { credential } = require('firebase-admin');
+const cors = require('cors')
 
 const app = express()
 const port = 10201
@@ -30,32 +30,42 @@ const db = getFirestore(fApp)
 app.use(cookieParser())
 app.use(express.static('../webapp'))
 
+//app.use(cors())
+
 // !!!TEMPORARY!!!
 // !!!REMOVE THIS FROM PRODUCTION BUILD!!!
-app.all('/', function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "X-Requested-With");
-  next();
-});
+app.get('/api/DEBUG-chatroom-messages', (req, res) => {
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  db.collection("chat-room/mock-chat-room/messages").onSnapshot((snapshot) => {
+
+    let send_to = []
+
+    snapshot.forEach((data) => {
+      send_to.push({
+        "text":data.get("text"),
+        "time":data.get("time"),
+        "user":data.get("user")
+      })
+    })
+
+    const toSend = `${JSON.stringify(send_to)}\n\n`
+    res.write(`data: ${toSend}`)
+  })
+
+})
 
 app.get('/api/get-chatroom-messages', (req, res) => {
-
-  //res.writeHead(200, {
-  //  'Content-Type': 'text/event-stream',
-  //  'Cache-Control': 'no-cache',
-  //  'Connection': 'keep-alive',
-  //});
-
-  //// Send SSE events
-  //setInterval(() => {
-  //  const eventData = `data: ${new Date().toLocaleTimeString()}\n\n`;
-  //  res.write(eventData);
-  //}, 1000);
 
   if (typeof(req.cookies.auth_token) === "undefined")
   {
     res.statusCode = 401
-    res.send("Authentication failed: missing auth token cookie")
+    res.end("Authentication Failed: No auth_token provided")
     return
   }
 
@@ -63,7 +73,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
   // in the DB, and find which chatroom they belong to. This endpoint will first send all the messages in the 
   // chatroom to the user, and steadily send new messages to the user, as they appear from their partner, as snapshots. 
 
-  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
+  auth.verifyIdToken(req.cookies.auth_token).then((decoded) => {
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -83,18 +93,13 @@ app.get('/api/get-chatroom-messages', (req, res) => {
         })
       })
 
-      const toSend = `${JSON.stringify(send_to)}\n\n`
-      res.write(toSend)
-
+      res.write(`data: ${JSON.stringify(send_to)}\n\n`)
     })
 
   }).catch((error) => {
     res.statusCode = 401
-    res.send(`Authentication Failed: ${error}`)
+    res.end(`Authentication failed: ${error}`)
   })
-
-
-
 })
 
 /*

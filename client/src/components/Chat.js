@@ -4,7 +4,6 @@ import '../assets/css/Chat.css'
 import { toast } from "react-toastify";
 import axios from "axios";
 
-
 function Chat() {
 
   // TODO: response will have the most recent chat messages, we will display these
@@ -16,22 +15,21 @@ function Chat() {
   // state of the chat-room the client is in. These messages will be properly rendered for the user, by us (client code)
 
   const [message, setMessage] = useState("")
-  //const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState([])
 
   useEffect(() => {
 
-    const eventSource = new EventSource('/api/get-chatroom-messages')
-    eventSource.onmessage = (event) => {
-      console.log(event.data)
-    };
+    const evtSource = new EventSource("http://localhost:10201/api/get-chatroom-messages");
+
+    evtSource.addEventListener("message", (alert) => {
+      console.log(alert.data)
+    })
 
     return () => {
-      eventSource.close();
-    };
+      evtSource.close()
+    }
 
   }, [])
-
-  const [messages, setMessages] = useState([])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -68,9 +66,6 @@ function Chat() {
     <div className="center-contents-horizontal center-contents-vertical flex-col margin-top chat-container">
 
       <div className="chat-message-window flex-col">
-
-
-
       </div>
 
       <form 
