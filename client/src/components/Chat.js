@@ -4,6 +4,7 @@ import '../assets/css/Chat.css'
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {auth} from '../firebase-config'
 
 function Chat() {
 
@@ -23,7 +24,7 @@ function Chat() {
   const sortAndSetMessages = (messageArray) => {
 
     messageArray.sort((m1, m2) => {
-      return m1.time - m2.time
+      return m2.time - m1.time
     })
 
     setAllMessages(messageArray)
@@ -34,7 +35,6 @@ function Chat() {
     const evtSource = new EventSource("http://localhost:10201/api/DEBUG-chatroom-messages");
 
     evtSource.addEventListener("message", (alert) => {
-      console.log(alert.data)
       sortAndSetMessages(JSON.parse(alert.data))
     })
 
@@ -48,7 +48,7 @@ function Chat() {
     e.preventDefault()
 
     // TODO: here, as well as the server, we need to verify that the message is valid. 
-    // that is one word, non-empty, a non-duplicate, etc. 
+    // that is: one word, non-empty, a non-duplicate, ascii chars only.
 
     if (message === "")
     {
@@ -84,13 +84,31 @@ function Chat() {
 
 
   return (
-    <div className="center-contents-horizontal center-contents-vertical flex-col margin-top chat-container">
+    <div className="center-contents-horizontal center-contents-vertical flex-col chat-container">
 
-      <div className="chat-message-window flex-col">
+      <div className="chat-message-window">
+
+        {
+          allMessages.map((mess) => {
+
+            return auth.currentUser.email === mess.user ? (
+              <div className="chat-message-element chat-message-me">
+                {mess.text}
+              </div>
+
+            ) : (
+              <div className="chat-message-element chat-message-other">
+                {mess.text}
+              </div>
+            )
+
+          })
+
+        }
       </div>
 
       <form 
-        className="chat-form flex-col"
+        className="chat-form flex-row"
         onSubmit={handleSubmit}
       >
         <input
@@ -100,7 +118,7 @@ function Chat() {
           value={message}
         />
         <button className="chat-button button" type="submit">
-          Send Message
+          <i className="fa-solid fa-share"></i>
         </button>
       </form>
 
