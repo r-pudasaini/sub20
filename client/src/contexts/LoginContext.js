@@ -21,7 +21,9 @@ function LoginContext ({children}) {
     }
     else
     {
-      cookies.set("auth_token", loginCookie)
+      cookies.set("auth_token", loginCookie, {
+        sameSite:"strict"
+      })
     }
 
   }, [loginCookie])
