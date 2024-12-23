@@ -108,7 +108,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
 
-  const isValidMessage = (str) => {
+  const isValidMessage = (str, existingMessages) => {
 
     // one word, non-empty, a non-duplicate, ascii chars only.
 
@@ -124,6 +124,10 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
 
     // TODO: check if str is the same as a message already sent. 
+    if (existingMessages.includes(str.toLocaleLowerCase()))
+    {
+      return `Error: ${str} already exists`
+    }
 
   }
 
@@ -138,7 +142,19 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     const message2send = req.body.message
 
-    const errorMessage = isValidMessage(message2send)
+    const messagesRef = db.collection("chat-room/mock-chat-room/messages")
+      // in a more completed implementation, dev-chat-room would instead be the chat room that the current player is assigned to
+      // if the current player is assigned to no chat room at all, then we send them a 403 error
+
+    const data = await messagesRef.get()
+
+    const existingMessages = []
+
+    data.docs.forEach((val) => {
+      existingMessages.push(val.get("text").toLocaleLowerCase())
+    })
+
+    const errorMessage = isValidMessage(message2send, existingMessages)
 
     if (errorMessage)
     {
@@ -147,9 +163,6 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       return
     }
 
-    const messagesRef = db.collection("chat-room/mock-chat-room/messages")
-      // in a more completed implementation, dev-chat-room would instead be the chat room that the current player is assigned to
-      // if the current player is assigned to no chat room at all, then we send them a 403 error
 
     await messagesRef.add({
       text: message2send,
