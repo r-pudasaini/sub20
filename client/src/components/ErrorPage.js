@@ -43,6 +43,7 @@ function ErrorPage() {
         setLoginCookie("")
       }).catch((error) => {
         console.log(`Sign out error: ${error}`)
+        setLoginCookie("")
       });
     }
 

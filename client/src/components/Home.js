@@ -21,7 +21,9 @@ function Home() {
       setLoginCookie("")
       toast.success("Logged Out!")
     }).catch((error) => {
-      toast.error("Error Signing Out. Please try again later. ")
+      setLoginCookie("")
+      //toast.error("Error Signing Out. Please try again later. ")
+      console.log(`Logout error: ${error}`)
     });
   }
 
