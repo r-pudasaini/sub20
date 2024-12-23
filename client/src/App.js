@@ -6,14 +6,15 @@ import Chat from './components/Chat'
 import 'react-toastify/dist/ReactToastify.css'
 import {Flip, ToastContainer} from 'react-toastify'
 
+
 import {
   BrowserRouter as Router,
   Routes,
   Route,
 } from "react-router-dom"
 
-
 function App() {
+
   return (
     <Router>
       <Routes>

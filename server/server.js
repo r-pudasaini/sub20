@@ -30,7 +30,7 @@ const db = getFirestore(fApp)
 app.use(cookieParser())
 app.use(express.static('../webapp'))
 
-//app.use(cors())
+app.use(cors())
 
 // !!!TEMPORARY!!!
 // !!!REMOVE THIS FROM PRODUCTION BUILD!!!

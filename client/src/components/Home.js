@@ -1,14 +1,12 @@
-import React, { useState } from 'react'
+import React, { useContext, useState } from 'react'
 import {useNavigate} from 'react-router-dom'
 import '../assets/css/global.css'
 import '../assets/css/Home.css'
 import How2PlayPopup from './HowToPlayPopup'
-import Cookies from 'universal-cookie'
-import {signInWithPopup} from 'firebase/auth'
+import {signInWithPopup, signOut} from 'firebase/auth'
 import {toast} from 'react-toastify'
 import {auth, provider} from '../firebase-config'
-
-export const cookies = new Cookies()
+import { Login } from '../contexts/LoginContext'
 
 function Home() {
 
@@ -16,9 +14,20 @@ function Home() {
 
   const navigate = useNavigate()
 
+  const {loginCookie, setLoginCookie} = useContext(Login)
+
+  const handleLogout = async () => {
+    signOut(auth).then(() => {
+      setLoginCookie("")
+      toast.success("Logged Out!")
+    }).catch((error) => {
+      toast.error("Error Signing Out. Please try again later. ")
+    });
+  }
+
   const handleLogin = async () => {
 
-    if (typeof(cookies.get("auth_token")) !== "undefined")
+    if (loginCookie)
     {
       toast.error("You are already Logged in!")
       return
@@ -27,7 +36,9 @@ function Home() {
     try {
       const result = await signInWithPopup(auth, provider)
       const token = await result.user.getIdToken();
-      cookies.set("auth_token", token)
+      setLoginCookie(token)
+      toast.success("Logged in!")
+
     } catch (error) {
       console.error(error)
       toast.error('Failed to sign in. Please try again later.')
@@ -36,7 +47,7 @@ function Home() {
 
   const handleStartGameClick = () => {
 
-    if (typeof(cookies.get("auth_token")) === "undefined")
+    if (!loginCookie)
     {
       toast.error('Must be logged in to play.')
     }
@@ -62,28 +73,51 @@ function Home() {
           How to Play?
         </div>
 
-        <div 
-          className="home-login-button unselectable button"
-          onClick={handleLogin}
-        >
-          <img
-            src={require('../assets/images/light-sign-in.png')}
-            width="200px"
-            height="auto"
-            alt='Google Sign In button'
-          />
-        </div>
+        { !loginCookie &&
+          <div 
+            className="home-login-button unselectable button"
+            onClick={handleLogin}
+          >
+            <img
+              src={require('../assets/images/light-sign-in.png')}
+              width="200px"
+              height="auto"
+              alt='Google Sign In button'
+            />
+          </div>
+        }
+
+        { loginCookie &&
+          <div 
+            className="home-logout-button unselectable jersey-15-regular button"
+            onClick={handleLogout}
+          >
+            Logout <i className="fa-solid fa-right-to-bracket" />
+          </div>
+        }
+
 
 
       </div>
 
       <div className="home-button-row">
-        <div
-          className="home-start-game-button unselectable jersey-15-regular button"
-          onClick={handleStartGameClick}
-        >
-          Find Me a Game
-        </div>
+        { loginCookie &&
+          <div
+            className="home-start-game-button-active unselectable jersey-15-regular button"
+            onClick={handleStartGameClick}
+          >
+            Find Me a Game
+          </div>
+        }
+
+        { !loginCookie &&
+          <div
+            className="home-start-game-button unselectable jersey-15-regular"
+          >
+            Find Me a Game
+          </div>
+        }
+
       </div>
 
       <How2PlayPopup isActive={how2playPopup} setState={setHow2PlayPopup} />

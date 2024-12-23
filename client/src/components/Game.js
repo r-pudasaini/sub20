@@ -43,7 +43,7 @@ function Game() {
 
     })
 
-  }, [])
+  }, [navigate])
 
   return (
     <div className='margin-top flex-col center-contents-vertical'>

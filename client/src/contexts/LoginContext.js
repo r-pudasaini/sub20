@@ -1,20 +1,33 @@
-import { createContext, useState } from "react";
-import Cookies from "universal-cookie";
+import { createContext, useEffect, useState } from "react";
+import { cookies } from "../cookie";
 
 export const Login = createContext({
-  isLoggedIn : false, 
-  changeLogin: () => null
+  loginCookie: "", 
+  setLoginCookie: () => null
 })
 
 Login.displayName = 'LoginContext'
 
 function LoginContext ({children}) {
 
-  const cookie = new Cookies()
-  const [login, setLogin] = useState(cookie.get('auth-token'))
+  const [loginCookie, setLoginCookie] = useState(cookies.get("auth_token"))
+
+
+  useEffect(() => {
+
+    if (!loginCookie)
+    {
+      cookies.remove("auth_token")
+    }
+    else
+    {
+      cookies.set("auth_token", loginCookie)
+    }
+
+  }, [loginCookie])
 
   return (
-    <Login.Provider value={{isLoggedIn:login, changeLogin:setLogin}}>{children}</Login.Provider>
+    <Login.Provider value={{loginCookie, setLoginCookie}}>{children}</Login.Provider>
   );
 }
 

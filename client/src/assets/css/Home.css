@@ -33,7 +33,27 @@
   margin-left: 2rem;
 }
 
+.home-logout-button {
+  color: black;
+  background-color: rgba(245,245,245);
+  border-radius : 15px;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+  font-size: 21px;
+  margin-left: 2rem;
+  padding : 0.5rem 1rem;
+
+}
+
 .home-start-game-button {
+  background-color: grey;
+  color : white;
+  padding : 0.5rem 1rem;
+  border-radius : 15px;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+  font-size: 21px;
+}
+
+.home-start-game-button-active {
   background-color: limegreen;
   color : white;
   padding : 0.5rem 1rem;

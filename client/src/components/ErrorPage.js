@@ -1,11 +1,14 @@
 import '../assets/css/global.css'
 import '../assets/css/ErrorPage.css'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
 import { useNavigate, Link, useParams } from 'react-router-dom'
+import { Login } from '../contexts/LoginContext'
+import { auth } from '../firebase-config'
+import {signOut} from 'firebase/auth'
 
 const codes2message = {
   "" : "Page Not Found\n",
-  "401" : "Attempt to access chat room without authentication. Please log in and try again\n",
+  "401" : "Attempt to access chat room without authentication, or with expired credentials. Please log in and try again\n",
   "403" : "Attempt to access chat room without valid permissions\n",
   "404" : "Page Not found\n",
 }
@@ -18,6 +21,7 @@ function ErrorPage() {
   const {code} = useParams()
 
   const [eCode, setECode] = useState("")
+  const {setLoginCookie} = useContext(Login)
 
   useEffect(() => {
     setTimeout(() => {
@@ -32,7 +36,18 @@ function ErrorPage() {
       setECode(code)
     }
 
-  }, [code])
+    // if the error is 401, we will set loggedIn to be false. 
+    if (code === "401")
+    {
+      signOut(auth).then(() => {
+        setLoginCookie("")
+      }).catch((error) => {
+        console.log(`Sign out error: ${error}`)
+      });
+    }
+
+
+  }, [code, setLoginCookie])
 
 
   return (
