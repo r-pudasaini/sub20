@@ -15,6 +15,19 @@ function Chat() {
 
   const navigate = useNavigate()
 
+  const getMessageType = (uemail) => {
+
+    if (uemail === auth.currentUser.email)
+    {
+      return "chat-message-me"
+    }
+    else if (uemail === "server")
+    {
+      return "chat-message-server"
+    }
+    return "chat-message-other"
+  }
+
   const isValidMessage = (str) => {
 
     // one word, non-empty, a non-duplicate, ascii chars only.
@@ -65,9 +78,6 @@ function Chat() {
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    // TODO: here, as well as the server, we need to verify that the message is valid. 
-    // that is: one word, non-empty, a non-duplicate, ascii chars only.
-
     const copyMessage = String(message)
 
     const errorMessage = isValidMessage(copyMessage)
@@ -110,19 +120,12 @@ function Chat() {
       <div className="chat-message-window">
 
         {
-          allMessages.map((mess) => {
-
-            return auth.currentUser.email === mess.user ? (
-              <div className="chat-message-element chat-message-me">
-                {mess.text}
-              </div>
-
-            ) : (
-              <div className="chat-message-element chat-message-other">
+          allMessages.map((mess, index) => {
+            return (
+              <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
                 {mess.text}
               </div>
             )
-
           })
 
         }

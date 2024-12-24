@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser')
 
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth')
-const { getFirestore } = require('firebase-admin/firestore')
+const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const serviceAccount = require('./private_key.json');
 const cors = require('cors')
 
@@ -32,6 +32,40 @@ app.use(express.static('../webapp'))
 
 app.use(cors())
 
+
+async function isValidPlayer(player)
+{
+  const players = db.collection("players/").where("email", '==', player)
+  const player_data = await players.get()
+
+  return player_data.docs.length !== 0
+}
+
+async function getPlayerChatroomName(player)
+{
+
+  const players = db.collection("players/").where("email", '==', player)
+  const player_data = await players.get()
+
+  if (player_data.docs.length === 0)
+  {
+    throw {code:403, msg:"Player is not part of a chatroom"}
+  }
+  else if (player_data.docs.length > 1)
+  {
+    throw {code:500, msg:"Player is part of many chatrooms"}
+  }
+
+  const room_name = player_data.docs[0].get("room")
+
+  if (!room_name) 
+  {
+    throw {code:500, msg:"Player is part of many chatrooms"}
+  }
+
+  return room_name
+}
+
 // !!!TEMPORARY!!!
 // !!!REMOVE THIS FROM PRODUCTION BUILD!!!
 app.get('/api/DEBUG-chatroom-messages', (req, res) => {
@@ -42,7 +76,7 @@ app.get('/api/DEBUG-chatroom-messages', (req, res) => {
     'Connection': 'keep-alive',
   });
 
-  db.collection("chat-room/mock-chat-room/messages").onSnapshot((snapshot) => {
+  db.collection("chat-room/mock-room3/messages").onSnapshot((snapshot) => {
 
     let send_to = []
 
@@ -69,11 +103,18 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     return
   }
 
-  // TODO: using the auth-token the client provides, we will look up the email of the user
-  // in the DB, and find which chatroom they belong to. This endpoint will first send all the messages in the 
-  // chatroom to the user, and steadily send new messages to the user, as they appear from their partner, as snapshots. 
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-  auth.verifyIdToken(req.cookies.auth_token).then((decoded) => {
+    let room_name
+
+    try {
+      room_name = await getPlayerChatroomName(decoded.email)
+    }
+    catch (error) {
+      res.status = error.code
+      res.send(error.message)
+      return
+    }
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -81,7 +122,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       'Connection': 'keep-alive',
     });
 
-    db.collection("chat-room/mock-chat-room/messages").onSnapshot((snapshot) => {
+    db.collection(`chat-room/${room_name}/messages`).onSnapshot((snapshot) => {
 
       let send_to = []
 
@@ -103,10 +144,9 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 })
 
 /*
-  Adds a messages send from the user (who we verify by examining their auth-token header)
+  Adds a message sent from the user (who we verify by examining their auth-token cookie)
 */
 app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
-
 
   const isValidMessage = (str, existingMessages) => {
 
@@ -122,8 +162,6 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       return "Error: Invalid Character Detected in Message";
     }
 
-
-    // TODO: check if str is the same as a message already sent. 
     if (existingMessages.includes(str.toLocaleLowerCase()))
     {
       return `Error: ${str} already exists`
@@ -140,11 +178,28 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
+    if (!decoded.email)
+    {
+      res.status = 403
+      res.send("Email field not provided. Necessary to play")
+      return
+    }
+
+    let room_name
+
+    try {
+      room_name = await getPlayerChatroomName(decoded.email)
+    }
+    catch (error) {
+      res.status = error.code
+      res.send(error.message)
+      return
+    }
+
     const message2send = req.body.message
 
-    const messagesRef = db.collection("chat-room/mock-chat-room/messages")
-      // in a more completed implementation, dev-chat-room would instead be the chat room that the current player is assigned to
-      // if the current player is assigned to no chat room at all, then we send them a 403 error
+    const messagesRef = db.collection(`chat-room/${room_name}/messages`)
+    const roomFieldsRef = db.doc(`chat-room/${room_name}`)
 
     const data = await messagesRef.get()
 
@@ -163,12 +218,44 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       return
     }
 
+    const chatRef = await roomFieldsRef.get()
+    const roundVal = chatRef.get("round")
 
-    await messagesRef.add({
-      text: message2send,
-      user: decoded.email,
-      time: Date.now()
+    const earlierMessage = chatRef.get("transit_messages").find((value) => {
+      return value.user === decoded.email
     })
+
+    if (earlierMessage)
+    {
+      res.statusCode = 400
+      res.send(`Player ${decoded.email} has already sent a message for round ${roundVal}`)
+      return
+    }
+
+    await roomFieldsRef.update({
+      transit_messages: FieldValue.arrayUnion({text:message2send, time:roundVal * 10, user:decoded.email})
+    })
+
+    const updatedTransit = await roomFieldsRef.get()
+    const updatedTransitArray = updatedTransit.get("transit_messages")
+
+    if (updatedTransitArray.length === 2)
+    {
+      await messagesRef.add(updatedTransitArray[0])
+      updatedTransitArray[1].time++
+      await messagesRef.add(updatedTransitArray[1])
+
+      await messagesRef.add({
+        text: `Round ${roundVal + 1}`,
+        user: "server",
+        time: roundVal * 10 + 2
+      })
+
+      await db.doc(`chat-room/${room_name}`).update({
+        transit_messages: [],
+        round : FieldValue.increment(1)
+      })
+    }
 
     res.statusCode = 200
     res.send("")
@@ -190,10 +277,8 @@ app.get('/api/start-game', (req, res) => {
     return
   }
 
-  auth.verifyIdToken(req.cookies.auth_token).then((decoded) => {
-    res.statusCode = 200
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    
     /*
       TODO: this is where things get a bit complicated. 
       we now have the information of the user that requested entry into our game. 
@@ -211,7 +296,18 @@ app.get('/api/start-game', (req, res) => {
       the time left until the room expires, and the name of the other person in the connection
     */
 
-    res.send("Valid token given")
+    const rv = await isValidPlayer(decoded.email)
+
+    if (!isValidPlayer(decoded.email))
+    {
+      console.log("got an invalid connection")
+      res.statusCode = 403
+      res.send("Not accepting new emails at this time.")
+      return
+    }
+
+    res.statusCode = 200
+    res.send("")
 
   }).catch((error) => {
     res.statusCode = 401
