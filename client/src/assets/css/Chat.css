@@ -40,18 +40,19 @@
 .chat-message-other {
   margin-left : 1rem;
   margin-right : auto;
-  background-color: grey;
+  background-color: #808080;
 }
 
 .chat-message-server {
   margin-left : 1rem;
   margin-right : auto;
-  background-color: gold;
+  background-color: #ffd700;
 }
 
 
 .chat-form {
   width : 60vw;
+  margin-bottom: 2rem;
 }
 
 
