@@ -241,20 +241,27 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     if (updatedTransitArray.length === 2)
     {
-      await messagesRef.add(updatedTransitArray[0])
-      updatedTransitArray[1].time++
-      await messagesRef.add(updatedTransitArray[1])
 
-      await messagesRef.add({
-        text: `Round ${roundVal + 1}`,
-        user: "server",
-        time: roundVal * 10 + 2
-      })
+      //TODO: add a delay here to stall for two seconds, improving user experience
+      setTimeout(async () => {
+        await messagesRef.add(updatedTransitArray[0])
+        updatedTransitArray[1].time++
+        await messagesRef.add(updatedTransitArray[1])
 
-      await db.doc(`chat-room/${room_name}`).update({
-        transit_messages: [],
-        round : FieldValue.increment(1)
-      })
+        await messagesRef.add({
+          text: `Round ${roundVal + 1}`,
+          user: "server",
+          time: roundVal * 10 + 2
+        })
+
+        await db.doc(`chat-room/${room_name}`).update({
+          transit_messages: [],
+          round : FieldValue.increment(1)
+        })
+
+
+      }, 2000)
+
     }
 
     res.statusCode = 200
