@@ -3,6 +3,7 @@ import {useNavigate} from 'react-router-dom'
 import '../assets/css/global.css'
 import '../assets/css/Home.css'
 import How2PlayPopup from './HowToPlayPopup'
+import LogoutPopup from './LogoutPopup'
 import {signInWithPopup, signOut} from 'firebase/auth'
 import {toast} from 'react-toastify'
 import {auth, provider} from '../firebase-config'
@@ -11,21 +12,12 @@ import { Login } from '../contexts/LoginContext'
 function Home() {
 
   const [how2playPopup, setHow2PlayPopup] = useState(false)
+  const [logoutPopup, setLogoutPopup] = useState(false)
 
   const navigate = useNavigate()
 
   const {loginCookie, setLoginCookie} = useContext(Login)
 
-  const handleLogout = async () => {
-    signOut(auth).then(() => {
-      setLoginCookie("")
-      toast.success("Logged Out!")
-    }).catch((error) => {
-      setLoginCookie("")
-      //toast.error("Error Signing Out. Please try again later. ")
-      console.log(`Logout error: ${error}`)
-    });
-  }
 
   const handleLogin = async () => {
 
@@ -92,7 +84,7 @@ function Home() {
         { loginCookie &&
           <div 
             className="home-logout-button unselectable jersey-15-regular button"
-            onClick={handleLogout}
+            onClick={() => setLogoutPopup(true)}
           >
             Logout <i className="fa-solid fa-right-to-bracket" />
           </div>
@@ -123,6 +115,7 @@ function Home() {
       </div>
 
       <How2PlayPopup isActive={how2playPopup} setState={setHow2PlayPopup} />
+      <LogoutPopup isActive={logoutPopup} setState={setLogoutPopup} />
 
     </div>
   )
