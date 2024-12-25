@@ -7,3 +7,10 @@
 .how-to-play-rule-line {
   margin-bottom: 0;
 }
+
+.how-to-play-rule-list {
+  font-size: 24px;
+  list-style:square;
+  font-family: "Proza Libre", serif;
+
+}

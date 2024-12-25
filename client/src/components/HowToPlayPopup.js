@@ -22,13 +22,13 @@ function HowToPlayPopup({isActive, setState}) {
 
                         <div>
                             <p className="title-font how-to-play-text">
-                                1: Sign in with Google and Join a Game with a random partner
+                                1) Sign in with Google and Join a Game with a random partner
                             </p>
                         </div>
 
                         <div className="flex-col center-contents-vertical">
                             <p className="title-font how-to-play-text">
-                                2: Wait until you see a chat page like below
+                                2) Wait until you see a chat page like below
                             </p>
 
                             <img
@@ -42,7 +42,7 @@ function HowToPlayPopup({isActive, setState}) {
 
                         <div className="flex-col center-contents-vertical">
                             <p className="title-font how-to-play-text">
-                                3: Try to send the same message as them: 
+                                3) Try to send the same message as them: 
                             </p>
                             <img
                                 src={require('../assets/images/how2play-sample-room.png')}
@@ -55,13 +55,13 @@ function HowToPlayPopup({isActive, setState}) {
 
                         <div className="flex-col center-contents-vertical">
                             <p className="title-font how-to-play-text">
-                                4: You get 20 rounds, and 10 minutes max to send the same thing.
+                                4) You get 20 rounds, and 10 minutes max to send the same thing.
                             </p>
                         </div>
 
                         <div className="flex-col center-contents-vertical">
                             <p className="title-font how-to-play-text">
-                                5: Try to send messages belonging to your category 
+                                5) Try to send messages belonging to your category 
                             </p>
 
                             <div className="flex-row center-contents-horizontal">
@@ -76,10 +76,10 @@ function HowToPlayPopup({isActive, setState}) {
                         </div>
                         <div className="flex-col center-contents-vertical">
                             <p className="title-font how-to-play-text how-to-play-rule-line">
-                                6: Message Rules
+                                6) Message Rules
                             </p>
 
-                            <ul>
+                            <ul className="how-to-play-rule-list">
                                 <li>
                                     1 word per message
                                 </li>
