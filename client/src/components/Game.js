@@ -27,6 +27,7 @@ function Game() {
 
     axios.get('/api/start-game').then((response) => {
 
+      console.log(response.data)
       navigate('/chat-page')
 
     }).catch((error) => {

@@ -15,8 +15,8 @@ const { assert } = require('node:console');
 const app = express()
 const port = 10201
 
-const SECONDS_PER_MINUTE = 60
-const DEFAULT_CHAT_TIME = 10 * SECONDS_PER_MINUTE
+const MILLI_SECONDS_PER_MINUTE = 60_000
+const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -40,6 +40,12 @@ app.use(cookieParser())
 app.use(express.static('../webapp'))
 
 app.use(cors())
+
+function getRandomCategory()
+{
+  // TODO: populate this with more random categories 
+  return 'Animals'
+}
 
 async function isRegisteredPlayer(player)
 {
@@ -77,12 +83,20 @@ async function getPlayerChatroomName(player)
 // SERVER WILL CRASH OTHERWISE
 async function getChatInfoOfPlayer(playerUID)
 {
-  const roomName = getChatInfoOfPlayer(playerUID)
+  const roomName = await getPlayerChatroomName(playerUID)
   const roomData = await db.doc(`chat-room/${roomName}`).get()
 
-  const partnerName = roomData.get("players").find((uid) => {
+  const partnerUID = roomData.get("players").find((uid) => {
     return uid !== playerUID
   })
+
+  assert(partnerUID, "Error expected partnerName to be a defined value")
+
+  const partnerNameDocs = await db.collection('players').where("uid", "==", partnerUID).get()
+
+  assert(partnerNameDocs.docs.length === 1, "Expected exactly one partner to be available")
+
+  partnerName = partnerNameDocs.docs[0].get("name")
 
   return {
     partnerName,
@@ -315,12 +329,14 @@ app.get('/api/start-game', (req, res) => {
       }
       else if (findPartnerEmitter.listenerCount("find-partner") == 1)
       {
+        const category = getRandomCategory()
+
         const rv = await db.collection("chat-room").add({
           round: 1, 
           transit_messages: [],
           players: [decoded.uid],
           expiry_time: Date.now() + DEFAULT_CHAT_TIME,
-          category: 'Animals'
+          category
         })
 
         await db.collection('players/').add({
@@ -328,6 +344,17 @@ app.get('/api/start-game', (req, res) => {
           uid:decoded.uid,
           name:decoded.name || "[Anonymous]",
           room:rv.id
+        })
+
+        await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: `Welcome to Sub 20! Your category is ${category}, you have 10 minutes and 20 chances to send the same message as your partner. Good Luck!`,
+          user: "server",
+          time: 5
+        })
+        await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: 'Round 1',
+          user: "server",
+          time: 5
         })
 
         registerRoomUpdateCallback(rv.id)
@@ -343,13 +370,12 @@ app.get('/api/start-game', (req, res) => {
         res.send("Error: Too many listeners on find partner callback")
         return
       }
-
     }
 
+    const chatInfo = await getChatInfoOfPlayer(decoded.uid)
     res.statusCode = 200
-    res.send("")
-    //res.send(await getChatInfoOfPlayer(decoded.uid))
-    return
+    res.send(chatInfo)
+
 
   }).catch((error) => {
     res.statusCode = 401
