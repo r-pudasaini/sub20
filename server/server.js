@@ -8,9 +8,15 @@ const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const serviceAccount = require('./private_key.json');
 const cors = require('cors')
+const Mutex = require('async-mutex').Mutex;
+const {EventEmitter, once } = require('node:events');
+const { assert } = require('node:console');
 
 const app = express()
 const port = 10201
+
+const SECONDS_PER_MINUTE = 60
+const DEFAULT_CHAT_TIME = 10 * SECONDS_PER_MINUTE
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -27,15 +33,17 @@ const fApp = initializeApp(firebaseConfig);
 const auth = getAuth(fApp);
 const db = getFirestore(fApp)
 
+const emitterLock = new Mutex()
+const findPartnerEmitter = new EventEmitter()
+
 app.use(cookieParser())
 app.use(express.static('../webapp'))
 
 app.use(cors())
 
-
-async function isValidPlayer(player)
+async function isRegisteredPlayer(player)
 {
-  const players = db.collection("players/").where("email", '==', player)
+  const players = db.collection("players/").where("uid", '==', player)
   const player_data = await players.get()
 
   return player_data.docs.length !== 0
@@ -43,8 +51,7 @@ async function isValidPlayer(player)
 
 async function getPlayerChatroomName(player)
 {
-
-  const players = db.collection("players/").where("email", '==', player)
+  const players = db.collection("players/").where("uid", '==', player)
   const player_data = await players.get()
 
   if (player_data.docs.length === 0)
@@ -66,33 +73,54 @@ async function getPlayerChatroomName(player)
   return room_name
 }
 
-// !!!TEMPORARY!!!
-// !!!REMOVE THIS FROM PRODUCTION BUILD!!!
-app.get('/api/DEBUG-chatroom-messages', (req, res) => {
+// MUST BE CALLED ON REGISTERED PLAYERS ONLY
+// SERVER WILL CRASH OTHERWISE
+async function getChatInfoOfPlayer(playerUID)
+{
+  const roomName = getChatInfoOfPlayer(playerUID)
+  const roomData = await db.doc(`chat-room/${roomName}`).get()
 
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  db.collection("chat-room/mock-room3/messages").onSnapshot((snapshot) => {
-
-    let send_to = []
-
-    snapshot.forEach((data) => {
-      send_to.push({
-        "text":data.get("text"),
-        "time":data.get("time"),
-        "user":data.get("user")
-      })
-    })
-
-    const toSend = `${JSON.stringify(send_to)}\n\n`
-    res.write(`data: ${toSend}`)
+  const partnerName = roomData.get("players").find((uid) => {
+    return uid !== playerUID
   })
 
-})
+  return {
+    partnerName,
+    category:roomData.get('category'),
+    expiresAt:roomData.get('expiry_time')
+  }
+}
+
+function registerRoomUpdateCallback(roomId)
+{
+  const roomFieldsRef = db.doc(`chat-room/${roomId}`)
+  const messagesRef = db.collection(`chat-room/${roomId}/messages`)
+
+  roomFieldsRef.onSnapshot(async (snapshot) => {
+
+    const updatedTransitArray = snapshot.get("transit_messages")
+    const roundVal = snapshot.get("round")
+
+    if (updatedTransitArray.length === 2)
+    {
+      await messagesRef.add(updatedTransitArray[0])
+      updatedTransitArray[1].time++
+      await messagesRef.add(updatedTransitArray[1])
+
+      await messagesRef.add({
+        text: `Round ${roundVal + 1}`,
+        user: "server",
+        time: roundVal * 10 + 2
+      })
+
+      await db.doc(`chat-room/${roomId}`).update({
+        transit_messages: [],
+        round : FieldValue.increment(1)
+      })
+    }
+  })
+}
+
 
 app.get('/api/get-chatroom-messages', (req, res) => {
 
@@ -108,7 +136,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     let room_name
 
     try {
-      room_name = await getPlayerChatroomName(decoded.email)
+      room_name = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
       res.status = error.code
@@ -178,17 +206,17 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    if (!decoded.email)
+    if (!decoded.uid)
     {
       res.status = 403
-      res.send("Email field not provided. Necessary to play")
+      res.send("Invalid UID provided. Necessary to play")
       return
     }
 
     let room_name
 
     try {
-      room_name = await getPlayerChatroomName(decoded.email)
+      room_name = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
       res.status = error.code
@@ -222,47 +250,19 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
     const roundVal = chatRef.get("round")
 
     const earlierMessage = chatRef.get("transit_messages").find((value) => {
-      return value.user === decoded.email
+      return value.user === decoded.uid
     })
 
     if (earlierMessage)
     {
       res.statusCode = 400
-      res.send(`Player ${decoded.email} has already sent a message for round ${roundVal}`)
+      res.send(`You already sent a message for round ${roundVal}`)
       return
     }
 
     await roomFieldsRef.update({
-      transit_messages: FieldValue.arrayUnion({text:message2send, time:roundVal * 10, user:decoded.email})
+      transit_messages: FieldValue.arrayUnion({text:message2send, time:roundVal * 10, user:decoded.uid})
     })
-
-    const updatedTransit = await roomFieldsRef.get()
-    const updatedTransitArray = updatedTransit.get("transit_messages")
-
-    if (updatedTransitArray.length === 2)
-    {
-
-      //TODO: add a delay here to stall for two seconds, improving user experience
-      setTimeout(async () => {
-        await messagesRef.add(updatedTransitArray[0])
-        updatedTransitArray[1].time++
-        await messagesRef.add(updatedTransitArray[1])
-
-        await messagesRef.add({
-          text: `Round ${roundVal + 1}`,
-          user: "server",
-          time: roundVal * 10 + 2
-        })
-
-        await db.doc(`chat-room/${room_name}`).update({
-          transit_messages: [],
-          round : FieldValue.increment(1)
-        })
-
-
-      }, 2000)
-
-    }
 
     res.statusCode = 200
     res.send("")
@@ -286,35 +286,70 @@ app.get('/api/start-game', (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    /*
-      TODO: this is where things get a bit complicated. 
-      we now have the information of the user that requested entry into our game. 
+    const registered = await isRegisteredPlayer(decoded.uid)
 
-      so what will we do? we need to check our database to see if a user with the email provided in the token already 
-      exists in a chatroom. If they do, then we will respond with the room number of that chatroom, and the time when the chatroom expires. 
-
-      If the user is NOT part of a game room, then they need to be added into a queue until another non-DB user attempts to log in.
-      If the queue already has a user that's waiting, then we need to create a DB Chatroom entry that will have a foreign key pointing 
-      to two users, along with its own primary key, 
-
-      and two user entries who will have their own primary keys and a foreign key pointing to the chat they belong to. 
-
-      on a successful call, this function will return information about the chat-room the client connected to, like the room's id number, 
-      the time left until the room expires, and the name of the other person in the connection
-    */
-
-    const rv = await isValidPlayer(decoded.email)
-
-    if (!isValidPlayer(decoded.email))
+    if (!registered)
     {
-      console.log("got an invalid connection")
-      res.statusCode = 403
-      res.send("Not accepting new emails at this time.")
-      return
+      const release = await emitterLock.acquire()
+
+      if (findPartnerEmitter.listenerCount("find-partner") === 0)
+      {
+        let partnerFound = once(findPartnerEmitter, "find-partner")
+        release()
+        const result = await partnerFound 
+
+        assert(result.length === 1, "Error: Expected exactly one chatroom id argument of type string")
+        assert(typeof(result[0]) === 'string', "Error: Expected exactly one chatroom id argument of type string")
+
+        await db.doc(`chat-room/${result[0]}`).update({
+          players: FieldValue.arrayUnion(decoded.uid)
+        })
+
+        await db.collection('players/').add({
+          email:decoded.email || "anonymous",
+          uid:decoded.uid,
+          name:decoded.name || "[Anonymous]",
+          room:result[0]
+        })
+
+      }
+      else if (findPartnerEmitter.listenerCount("find-partner") == 1)
+      {
+        const rv = await db.collection("chat-room").add({
+          round: 1, 
+          transit_messages: [],
+          players: [decoded.uid],
+          expiry_time: Date.now() + DEFAULT_CHAT_TIME,
+          category: 'Animals'
+        })
+
+        await db.collection('players/').add({
+          email:decoded.email || "anonymous",
+          uid:decoded.uid,
+          name:decoded.name || "[Anonymous]",
+          room:rv.id
+        })
+
+        registerRoomUpdateCallback(rv.id)
+        findPartnerEmitter.emit("find-partner", rv.id)
+        assert(findPartnerEmitter.listenerCount("find-partner") === 0, "Error: Expected there to be no more listeners after emit.")
+        release()
+      }
+      else
+      {
+        // throw an internal server error
+        release()
+        res.statusCode = 500
+        res.send("Error: Too many listeners on find partner callback")
+        return
+      }
+
     }
 
     res.statusCode = 200
     res.send("")
+    //res.send(await getChatInfoOfPlayer(decoded.uid))
+    return
 
   }).catch((error) => {
     res.statusCode = 401
@@ -323,7 +358,7 @@ app.get('/api/start-game', (req, res) => {
   
 })
 
-// redirect 404 errors to the client
+// redirect 404 errors to the client for them to route
 app.use((req, res, next) => { 
   res.status(404).sendFile('index.html', {root: '../webapp/'})
 }) 

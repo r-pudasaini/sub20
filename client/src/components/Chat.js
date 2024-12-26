@@ -15,13 +15,13 @@ function Chat() {
 
   const navigate = useNavigate()
 
-  const getMessageType = (uemail) => {
+  const getMessageType = (uid) => {
 
-    if (uemail === auth.currentUser.email)
+    if (uid === auth.currentUser.uid)
     {
       return "chat-message-me"
     }
-    else if (uemail === "server")
+    else if (uid === "server")
     {
       return "chat-message-server"
     }
@@ -63,7 +63,7 @@ function Chat() {
 
   useEffect(() => {
 
-    const evtSource = new EventSource("http://localhost:10201/api/DEBUG-chatroom-messages");
+    const evtSource = new EventSource("http://localhost:10201/api/get-chatroom-messages");
 
     evtSource.addEventListener("message", (alert) => {
       sortAndSetMessages(JSON.parse(alert.data))
