@@ -92,14 +92,16 @@ async function getChatInfoOfPlayer(playerUID)
 
   assert(partnerUID, "Error expected partnerName to be a defined value")
 
-  const partnerNameDocs = await db.collection('players').where("uid", "==", partnerUID).get()
+  const partnerDocs = await db.collection('players').where("uid", "==", partnerUID).get()
 
-  assert(partnerNameDocs.docs.length === 1, "Expected exactly one partner to be available")
+  assert(partnerDocs.docs.length === 1, "Expected exactly one partner to be available")
 
-  partnerName = partnerNameDocs.docs[0].get("name")
+  const partnerName = partnerDocs.docs[0].get("name")
+  const partnerEmail = partnerDocs.docs[0].get("email")
 
   return {
     partnerName,
+    partnerEmail,
     category:roomData.get('category'),
     expiresAt:roomData.get('expiry_time')
   }

@@ -1,17 +1,21 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import '../assets/css/global.css'
 import '../assets/css/Chat.css'
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {auth} from '../firebase-config'
-
-
+import { Chatroom } from "../contexts/ChatroomContext";
 
 function Chat() {
 
+  const {chatDetails, setChatDetails} = useContext(Chatroom)
+
   const [message, setMessage] = useState("")
   const [allMessages, setAllMessages] = useState([])
+
+  // get the time field of allMessages, divide by 10, add 1. This is the round number. 
+  // if this number ever dips beneath zero, the game is over. 
 
   const navigate = useNavigate()
 

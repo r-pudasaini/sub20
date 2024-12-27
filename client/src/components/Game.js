@@ -1,14 +1,16 @@
-import React, { useEffect } from 'react'
+import React, { useContext, useEffect } from 'react'
 import '../assets/css/global.css'
 import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
 import {useNavigate} from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import {Chatroom} from '../contexts/ChatroomContext'
 
 function Game() {
 
   const navigate = useNavigate()
+  const {setChatDetails} = useContext(Chatroom)
 
   useEffect(() => {
 
@@ -27,7 +29,7 @@ function Game() {
 
     axios.get('/api/start-game').then((response) => {
 
-      console.log(response.data)
+      setChatDetails(response.data)
       navigate('/chat-page')
 
     }).catch((error) => {
@@ -44,7 +46,7 @@ function Game() {
 
     })
 
-  }, [navigate])
+  }, [navigate, setChatDetails])
 
   return (
     <div className='margin-top flex-col center-contents-vertical'>
