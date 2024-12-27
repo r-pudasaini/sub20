@@ -4,8 +4,10 @@ import '../assets/css/Chat.css'
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import {auth} from '../firebase-config'
 import { Chatroom } from "../contexts/ChatroomContext";
+import { Login } from "../contexts/LoginContext";
+import {jwtDecode} from 'jwt-decode'
+
 
 function Chat() {
 
@@ -14,14 +16,18 @@ function Chat() {
   const [message, setMessage] = useState("")
   const [allMessages, setAllMessages] = useState([])
 
+  const {loginCookie} = useContext(Login)
+
   // get the time field of allMessages, divide by 10, add 1. This is the round number. 
   // if this number ever dips beneath zero, the game is over. 
+
+  const [userInfo, setUserInfo] = useState({})
 
   const navigate = useNavigate()
 
   const getMessageType = (uid) => {
 
-    if (uid === auth.currentUser.uid)
+    if (uid === userInfo.sub)
     {
       return "chat-message-me"
     }
@@ -66,6 +72,22 @@ function Chat() {
   }
 
   useEffect(() => {
+
+    if (!loginCookie)
+    {
+      navigate('error/401')
+      return
+    }
+
+    try {
+      const result = jwtDecode(loginCookie)
+      setUserInfo(result)
+
+    } catch (error)
+    {
+      navigate('error/401')
+      return
+    }
 
     const evtSource = new EventSource("http://localhost:10201/api/get-chatroom-messages");
 

@@ -44,9 +44,13 @@
 }
 
 .chat-message-server {
-  margin-left : 1rem;
+  margin-left : auto;
   margin-right : auto;
-  background-color: #ffd700;
+  background-color: rgba(0,0,0,0.5);
+  color: white;
+  width : 100%;
+  max-width: 100%;
+  text-align: center;
 }
 
 
