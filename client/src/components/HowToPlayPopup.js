@@ -1,7 +1,7 @@
 import '../assets/css/Popup.css'
 import '../assets/css/HowToPlay.css'
 import '../assets/css/global.css'
-import { useState } from 'react';
+import { useState } from 'react'
 
 import how2play1 from '../assets/images/how2play-1.png'
 import how2play2 from '../assets/images/how2play-2.png'
@@ -10,7 +10,6 @@ import how2play4 from '../assets/images/how2play-4.png'
 import how2play5 from '../assets/images/how2play-5.png'
 
 function HowToPlayPopup({isActive, setState}) {
-
 
     const [index, setIndex] = useState(0)
 
@@ -30,10 +29,19 @@ function HowToPlayPopup({isActive, setState}) {
         'You can only send one word at a time, alphabet characters only, non-empty messages, messages distinct from others previously submitted. You have 10 minutes, and 20 guesses.',
     ]
 
-
+    const handleKeyDown = (event) => {
+        if (event.key === "ArrowLeft")
+        {
+            setIndex((((index - 1) % 5) + 5) % 5)
+        }
+        else if (event.key === "ArrowRight")
+        {
+            setIndex( (index + 1) % 5)
+        }
+    }
 
     return (isActive) ? (
-        <div className="popup">
+        <div className="popup" tabIndex={0} onKeyDown={handleKeyDown}>
 
             <div className="popup-card">
                 <i
