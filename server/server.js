@@ -290,6 +290,36 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
 })
 
+app.get('/api/chat-info', (req, res) => {
+  if (typeof(req.cookies.auth_token) === "undefined")
+  {
+    res.statusCode = 401
+    res.send("Authentication failed: missing auth token cookie")
+    return
+  }
+
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
+    const registered = await isRegisteredPlayer(decoded.uid)
+
+    if (!registered)
+    {
+      res.statusCode = 403
+      res.send("Must be registered within a chatroom")
+      return
+    }
+
+    const chatInfo = await getChatInfoOfPlayer(decoded.uid)
+    res.statusCode = 200
+    res.send(chatInfo)
+
+
+  }).catch((error) => {
+    res.statusCode = 401
+    res.send(`Authentication failed: ${error}`)
+  })
+
+})
+
 
 app.get('/api/start-game', (req, res) => {
 
@@ -350,13 +380,13 @@ app.get('/api/start-game', (req, res) => {
 
         await db.collection(`chat-room/${rv.id}/messages`).add({
           text: `Welcome to Sub 20! Your category is ${category}, you have 10 minutes and 20 chances to send the same message as your partner. Good Luck!`,
-          user: "server",
+          user: "server-first",
           time: 5
         })
         await db.collection(`chat-room/${rv.id}/messages`).add({
           text: 'Round 1',
           user: "server",
-          time: 5
+          time: 6
         })
 
         registerRoomUpdateCallback(rv.id)

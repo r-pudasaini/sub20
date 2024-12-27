@@ -10,130 +10,12 @@ import {jwtDecode} from 'jwt-decode'
 import Countdown from 'react-countdown';
 
 
-const initialM = [
-  {
-    text:"m1",
-    time:1,
-    user:"server"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  },
-  {
-    text:"m4",
-    time:4,
-    user:"server"
-  },
-  {
-    text:"m1",
-    time:1,
-    user:"server"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  },
-  {
-    text:"m4",
-    time:4,
-    user:"server"
-  },
-  {
-    text:"m1",
-    time:1,
-    user:"x2fdB3UyA9er6W7w6mgSF1yrS7L2"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  },
-  {
-    text:"m4",
-    time:4,
-    user:"server"
-  },
-  {
-    text:"m1",
-    time:1,
-    user:"server"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  },
-  {
-    text:"m4",
-    time:4,
-    user:"server"
-  },
-  {
-    text:"m1",
-    time:1,
-    user:"server"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  },
-  {
-    text:"m4",
-    time:4,
-    user:"server"
-  },
-  {
-    text:"m1",
-    time:1,
-    user:"server"
-  },
-  {
-    text:"m2",
-    time:2,
-    user:"other"
-  },
-  {
-    text:"m3",
-    time:3,
-    user:"other"
-  }
-]
-
 function Chat() {
 
-  const {chatDetails, setChatDetails} = useContext(Chatroom)
+  const {chatDetails} = useContext(Chatroom)
 
   const [message, setMessage] = useState("")
-  const [allMessages, setAllMessages] = useState(initialM)
+  const [allMessages, setAllMessages] = useState([])
 
   const {loginCookie} = useContext(Login)
 
@@ -153,6 +35,10 @@ function Chat() {
     else if (uid === "server")
     {
       return "chat-message-server"
+    }
+    else if (uid === "server-first")
+    {
+      return "chat-message-server-first"
     }
     return "chat-message-other"
   }
@@ -218,7 +104,7 @@ function Chat() {
       evtSource.close()
     }
 
-  }, [])
+  }, [loginCookie, navigate])
 
   const handleSubmit = (e) => {
     e.preventDefault()
