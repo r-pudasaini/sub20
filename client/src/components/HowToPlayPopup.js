@@ -1,8 +1,36 @@
 import '../assets/css/Popup.css'
 import '../assets/css/HowToPlay.css'
 import '../assets/css/global.css'
+import { useState } from 'react';
+
+import how2play1 from '../assets/images/how2play-1.png'
+import how2play2 from '../assets/images/how2play-2.png'
+import how2play3 from '../assets/images/how2play-3.png'
+import how2play4 from '../assets/images/how2play-4.png'
+import how2play5 from '../assets/images/how2play-5.png'
 
 function HowToPlayPopup({isActive, setState}) {
+
+
+    const [index, setIndex] = useState(0)
+
+    const images = [
+        how2play1,
+        how2play2,
+        how2play3,
+        how2play4,
+        how2play5,
+    ]
+
+    const altText = [
+        'Sign in with google, then click the green button to play',
+        'When a partner is found, you should see an chatroom in front of you. You are trying to send the same message as them',
+        'Your messages are white, your partner\'s messages are grey, and server messages are yellow',
+        'The first message in each chatroom is your assigned category. Send messages that belong to your category',
+        'You can only send one word at a time, alphabet characters only, non-empty messages, messages distinct from others previously submitted. You have 10 minutes, and 20 guesses.',
+    ]
+
+
 
     return (isActive) ? (
         <div className="popup">
@@ -13,92 +41,32 @@ function HowToPlayPopup({isActive, setState}) {
                     onClick={() => setState(false)}>
                 </i>
 
-                <div className="text-box">
-                    <h1 className="jersey-15-large">
-                        How to Play
-                    </h1>
+                <div className="popup-page-number">
+                    {index + 1} / 5
+                </div>
 
-                    <div className="how-to-play-instruction-container flex-col center-contents-vertical">
+                <div className="popup-elements">
 
-                        <div>
-                            <p className="title-font how-to-play-text">
-                                1) Sign in with Google and Join a Game with a random partner
-                            </p>
-                        </div>
+                    <i 
+                        className="fa-solid fa-chevron-left popup-prev"
+                        onClick={() => setIndex((((index - 1) % 5) + 5) % 5)}
+                    />
 
-                        <div className="flex-col center-contents-vertical">
-                            <p className="title-font how-to-play-text">
-                                2) Wait until you see a chat page like below
-                            </p>
+                    <img
+                        src={images[index]}
+                        alt={altText[index]}
+                        width="80%"
+                        height="auto"
+                    />
 
-                            <img
-                                src={require('../assets/images/how2play-chat-page.png')}
-                                alt="Chat window"
-                                height="auto"
-                                width="50%"
-                            />
-
-                        </div>
-
-                        <div className="flex-col center-contents-vertical">
-                            <p className="title-font how-to-play-text">
-                                3) Try to send the same message as them: 
-                            </p>
-                            <img
-                                src={require('../assets/images/how2play-sample-room.png')}
-                                alt="Sample chat room"
-                                height="auto"
-                                width="50%"
-                            />
-
-                        </div>
-
-                        <div className="flex-col center-contents-vertical">
-                            <p className="title-font how-to-play-text">
-                                4) You get 20 rounds, and 10 minutes max to send the same thing.
-                            </p>
-                        </div>
-
-                        <div className="flex-col center-contents-vertical">
-                            <p className="title-font how-to-play-text">
-                                5) Try to send messages belonging to your category 
-                            </p>
-
-                            <div className="flex-row center-contents-horizontal">
-                                <img
-                                    src={require('../assets/images/how2play-dos-and-donts.png')}
-                                    alt="Acceptable and unacceptable messages"
-                                    height="auto"
-                                    width="50%"
-                                />
-
-                            </div>
-                        </div>
-                        <div className="flex-col center-contents-vertical">
-                            <p className="title-font how-to-play-text how-to-play-rule-line">
-                                6) Message Rules
-                            </p>
-
-                            <ul className="how-to-play-rule-list">
-                                <li>
-                                    1 word per message
-                                </li>
-                                <li>
-                                    Alphabet Characters only
-                                </li>
-                                <li>
-                                    No empty Messages
-                                </li>
-                                <li>
-                                    No messages that have already been sent
-                                </li>
-                            </ul>
-
-                        </div>
-
-                    </div>
+                    <i 
+                        className="fa-solid fa-chevron-right popup-next"
+                        onClick={() => setIndex( (index + 1) % 5)}
+                    />
 
                 </div>
+
+
             </div>
         </div>
     ) : <></>;

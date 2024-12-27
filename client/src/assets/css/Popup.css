@@ -24,6 +24,33 @@
     overflow: auto;
 }
 
+.popup-page-number {
+    font-size : 1vmax;
+}
+
+.popup-elements {
+    display : flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.popup-elements > * {
+    margin-left : auto;
+    margin-right : auto;
+}
+
+.popup-elements i {
+    font-size: 3vmax;
+    height : 100%;
+    padding : 8vmax 0.5vmax;
+
+}
+
+.popup-elements i:hover {
+    cursor: pointer;
+    background-color: rgba(0,0,0,0.4);
+}
+
 .close-button {
     position : absolute;
     color : white;
