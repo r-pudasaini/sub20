@@ -1,12 +1,39 @@
 
 
+.chat-body {
+  width : 60%;
+  border: 1px solid white;
+  border-radius: 10px;
+  margin-top : 1rem;
+  margin-bottom : 0.5rem;
+}
+
+.chat-header {
+  padding: 1rem;
+  height: fit-content;
+  border-radius: 8px 8px 0 0;
+  color: var(--vim-red);
+  font-weight: bold;
+  background-color: white;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.chat-partner-info {
+  margin-right: auto;
+}
+
+.chat-countdown {
+  margin-left: auto;
+  text-align: center;
+}
+
 .chat-message-window {
   margin-top : 1rem;
   margin-bottom : 0.5rem;
   height : 90vh;
-  border: 1px solid white;
-  border-radius: 10px;
-  width : 60%;
+  width : 100%;
   overflow: auto;
   display: flex;
   flex-direction: column-reverse;
@@ -48,8 +75,8 @@
   margin-right : auto;
   background-color: rgba(0,0,0,0.5);
   color: white;
-  width : 100%;
-  max-width: 100%;
+  width : 90%;
+  max-width: 90%;
   text-align: center;
 }
 

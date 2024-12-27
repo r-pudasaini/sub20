@@ -7,14 +7,133 @@ import { useNavigate } from "react-router-dom";
 import { Chatroom } from "../contexts/ChatroomContext";
 import { Login } from "../contexts/LoginContext";
 import {jwtDecode} from 'jwt-decode'
+import Countdown from 'react-countdown';
 
+
+const initialM = [
+  {
+    text:"m1",
+    time:1,
+    user:"server"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  },
+  {
+    text:"m4",
+    time:4,
+    user:"server"
+  },
+  {
+    text:"m1",
+    time:1,
+    user:"server"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  },
+  {
+    text:"m4",
+    time:4,
+    user:"server"
+  },
+  {
+    text:"m1",
+    time:1,
+    user:"x2fdB3UyA9er6W7w6mgSF1yrS7L2"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  },
+  {
+    text:"m4",
+    time:4,
+    user:"server"
+  },
+  {
+    text:"m1",
+    time:1,
+    user:"server"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  },
+  {
+    text:"m4",
+    time:4,
+    user:"server"
+  },
+  {
+    text:"m1",
+    time:1,
+    user:"server"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  },
+  {
+    text:"m4",
+    time:4,
+    user:"server"
+  },
+  {
+    text:"m1",
+    time:1,
+    user:"server"
+  },
+  {
+    text:"m2",
+    time:2,
+    user:"other"
+  },
+  {
+    text:"m3",
+    time:3,
+    user:"other"
+  }
+]
 
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
 
   const [message, setMessage] = useState("")
-  const [allMessages, setAllMessages] = useState([])
+  const [allMessages, setAllMessages] = useState(initialM)
 
   const {loginCookie} = useContext(Login)
 
@@ -123,6 +242,8 @@ function Chat() {
       if (error.status === 400) 
       {
         // toast the error message that the server sent. 
+        toast.error(error.response.data)
+        console.log(error)
 
       }
       else if (error.status > 400 && error.status <= 499)
@@ -142,20 +263,35 @@ function Chat() {
 
   return (
     <div className="center-contents-horizontal center-contents-vertical flex-col chat-container">
+      <div className="chat-body flex-col">
 
-      <div className="chat-message-window">
+        <div className="chat-header">
 
-        {
-          allMessages.map((mess, index) => {
-            return (
-              <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
-                {mess.text}
-              </div>
-            )
-          })
+          <div className="chat-partner-info">
+            <div>Chatting with: {chatDetails.partnerName}</div>
+          </div>
 
-        }
+          <div className="chat-countdown">
+            <div>Time Left:</div>
+            <Countdown date={chatDetails.expiresAt} />
+          </div>
+
+        </div>
+
+        <div className="chat-message-window">
+          {
+            allMessages.map((mess, index) => {
+              return (
+                <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
+                  {mess.text}
+                </div>
+              )
+            })
+
+          }
+        </div>
       </div>
+
 
       <form 
         className="chat-form flex-row"
