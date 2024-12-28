@@ -44,6 +44,8 @@ app.use(cors())
 function getRandomCategory()
 {
   // TODO: populate this with more random categories 
+  // some ideas: 'Common First Names', 'Favorite Companies', 'Colors', 'Fruits', 'Vegetables', 'Reptiles', 'Mammals', 
+  // 'Marine Animals', 'Countries in the World', 'States of the USA', 'popular songs', 
   return 'Animals'
 }
 
@@ -112,31 +114,72 @@ function registerRoomUpdateCallback(roomId)
   const roomFieldsRef = db.doc(`chat-room/${roomId}`)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
 
-  roomFieldsRef.onSnapshot(async (snapshot) => {
+  const gameOverEmitter = new EventEmitter()
+
+  const unsub = roomFieldsRef.onSnapshot(async (snapshot) => {
 
     const updatedTransitArray = snapshot.get("transit_messages")
     const roundVal = snapshot.get("round")
 
     if (updatedTransitArray.length === 2)
     {
+
+      let room_death_message = ""
+
+      if (updatedTransitArray[0].text.toLocaleLowerCase() === updatedTransitArray[1].text.toLocaleLowerCase())
+      {
+        room_death_message = "Victory!"
+      }
+      else if (roundVal > 20)
+      {
+        room_death_message = "Defeat: Out of rounds"
+      }
+      else if (Date.now() > roomFieldsRef.get("expiry_time"))
+      {
+        room_death_message = "Defeat: Time ran out"
+      }
+
       await messagesRef.add(updatedTransitArray[0])
       updatedTransitArray[1].time++
       await messagesRef.add(updatedTransitArray[1])
 
-      await messagesRef.add({
-        text: `Round ${roundVal + 1}`,
-        user: "server",
-        time: roundVal * 10 + 2
-      })
+
+      if (room_death_message)
+      {
+        await messagesRef.add({
+          text: room_death_message,
+          user: "server-first",
+          time: roundVal * 10 + 2
+        })
+      }
+      else
+      {
+        await messagesRef.add({
+          text: `Round ${roundVal + 1}`,
+          user: "server",
+          time: roundVal * 10 + 2
+        })
+      }
 
       await db.doc(`chat-room/${roomId}`).update({
         transit_messages: [],
-        round : FieldValue.increment(1)
+        round : FieldValue.increment(1),
+        room_death_message
       })
+
+      if (room_death_message)
+      {
+        gameOverEmitter.emit("game-over")
+      }
     }
   })
-}
 
+  gameOverEmitter.once('game-over', () => {
+    console.log("unsubbing from update room listener")
+    unsub()
+  })
+
+}
 
 app.get('/api/get-chatroom-messages', (req, res) => {
 
@@ -160,13 +203,24 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       return
     }
 
+
+    const roomFieldsRef = await db.doc(`chat-room/${room_name}`).get()
+    const deathMessage = roomFieldsRef.get("room_death_message")
+    
+    if (deathMessage)
+    {
+      res.statusCode = 400
+      res.send(`The game in this room is over. Please join another room.`)
+      return
+    }
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
 
-    db.collection(`chat-room/${room_name}/messages`).onSnapshot((snapshot) => {
+    const unsub = db.collection(`chat-room/${room_name}/messages`).onSnapshot((snapshot) => {
 
       let send_to = []
 
@@ -179,6 +233,15 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       })
 
       res.write(`data: ${JSON.stringify(send_to)}\n\n`)
+
+      // TODO: somehow, within the snapshot, we need to figure out if the game on this 
+      // chatroom is over. 
+
+    })
+
+    req.on("close", () => {
+      console.log("unsubbing from get-chatroom snapshot")
+      unsub()
     })
 
   }).catch((error) => {
@@ -222,13 +285,6 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    if (!decoded.uid)
-    {
-      res.status = 403
-      res.send("Invalid UID provided. Necessary to play")
-      return
-    }
-
     let room_name
 
     try {
@@ -244,8 +300,18 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     const messagesRef = db.collection(`chat-room/${room_name}/messages`)
     const roomFieldsRef = db.doc(`chat-room/${room_name}`)
-
+    const chatRef = await roomFieldsRef.get()
+    const roundVal = chatRef.get("round")
     const data = await messagesRef.get()
+
+    const deathMessage = chatRef.get("room_death_message")
+
+    if (deathMessage)
+    {
+      res.statusCode = 400
+      res.send(`The game in this room is over. Please join a new room.`)
+      return
+    }
 
     const existingMessages = []
 
@@ -261,9 +327,6 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       res.send(errorMessage)
       return
     }
-
-    const chatRef = await roomFieldsRef.get()
-    const roundVal = chatRef.get("round")
 
     const earlierMessage = chatRef.get("transit_messages").find((value) => {
       return value.user === decoded.uid
@@ -320,7 +383,6 @@ app.get('/api/chat-info', (req, res) => {
 
 })
 
-
 app.get('/api/start-game', (req, res) => {
 
   if (typeof(req.cookies.auth_token) === "undefined")
@@ -333,6 +395,10 @@ app.get('/api/start-game', (req, res) => {
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
     const registered = await isRegisteredPlayer(decoded.uid)
+
+    // TODO: add a function that will attempt to un-register a player. 
+    // the function will return true if the player was part of a dead room, and was removed from it
+    // Returns false if the player was part of an active chatroom, or no chatroom at all. 
 
     if (!registered)
     {
@@ -368,7 +434,8 @@ app.get('/api/start-game', (req, res) => {
           transit_messages: [],
           players: [decoded.uid],
           expiry_time: Date.now() + DEFAULT_CHAT_TIME,
-          category
+          category,
+          room_death_message: ""
         })
 
         await db.collection('players/').add({
@@ -381,12 +448,13 @@ app.get('/api/start-game', (req, res) => {
         await db.collection(`chat-room/${rv.id}/messages`).add({
           text: `Welcome to Sub 20! Your category is ${category}, you have 10 minutes and 20 chances to send the same message as your partner. Good Luck!`,
           user: "server-first",
-          time: 5
+          time: 1
         })
+
         await db.collection(`chat-room/${rv.id}/messages`).add({
           text: 'Round 1',
           user: "server",
-          time: 6
+          time: 2
         })
 
         registerRoomUpdateCallback(rv.id)

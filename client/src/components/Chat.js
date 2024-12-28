@@ -20,7 +20,7 @@ function Chat() {
   const {loginCookie} = useContext(Login)
 
   // get the time field of allMessages, divide by 10, add 1. This is the round number. 
-  // if this number ever dips beneath zero, the game is over. 
+  // if this number ever gets past 20, the game is over. 
 
   const [userInfo, setUserInfo] = useState({})
 
@@ -98,6 +98,11 @@ function Chat() {
 
     evtSource.addEventListener("message", (alert) => {
       sortAndSetMessages(JSON.parse(alert.data))
+    })
+
+    evtSource.addEventListener("error", (error) => {
+      console.log(error)
+      evtSource.close()
     })
 
     return () => {
