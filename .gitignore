@@ -7,3 +7,4 @@ Cargo.lock
 /server/firebase-config.js
 /server/.env
 /server/private_key.json
+/server/categories.js

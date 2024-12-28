@@ -12,6 +12,8 @@ const Mutex = require('async-mutex').Mutex;
 const {EventEmitter, once } = require('node:events');
 const { assert } = require('node:console');
 
+const {categories} = require('./categories')
+
 const app = express()
 const port = 10201
 
@@ -43,10 +45,7 @@ app.use(cors())
 
 function getRandomCategory()
 {
-  // TODO: populate this with more random categories 
-  // some ideas: 'Common First Names', 'Favorite Companies', 'Colors', 'Fruits', 'Vegetables', 'Reptiles', 'Mammals', 
-  // 'Marine Animals', 'Countries in the World', 'States of the USA', 'popular songs', 
-  return 'Animals'
+  return categories[Math.floor(Math.random() * categories.length)]
 }
 
 async function isRegisteredPlayer(player)
@@ -55,6 +54,17 @@ async function isRegisteredPlayer(player)
   const player_data = await players.get()
 
   return player_data.docs.length !== 0
+}
+
+async function unregister(player, isRegistered)
+{
+  // TODO: 
+  // 1. check the player's chatroom in the DB
+  // 2. in that chatroom record, remove the player from the players entry array
+  // 3. in the register room update callback, add a snapshot that will 
+  // delete the chatroom when both players remove themselves from the players entry array
+  // when this operation is done, the snapshot must unsub itself. 
+
 }
 
 async function getPlayerChatroomName(player)
@@ -130,7 +140,7 @@ function registerRoomUpdateCallback(roomId)
       {
         room_death_message = "Victory!"
       }
-      else if (roundVal > 20)
+      else if (roundVal >= 20)
       {
         room_death_message = "Defeat: Out of rounds"
       }
