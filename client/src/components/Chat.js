@@ -97,12 +97,19 @@ function Chat() {
     const evtSource = new EventSource("http://localhost:10201/api/get-chatroom-messages");
 
     evtSource.addEventListener("message", (alert) => {
-      sortAndSetMessages(JSON.parse(alert.data))
-    })
 
-    evtSource.addEventListener("error", (error) => {
-      console.log(error)
-      evtSource.close()
+      if (alert.data === '[]')
+      {
+        console.log("got heartbeat message")
+        return
+      }
+      else if (alert.data === 'game over')
+      {
+        evtSource.close()
+        return
+      }
+
+      sortAndSetMessages(JSON.parse(alert.data))
     })
 
     return () => {

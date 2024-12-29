@@ -18,7 +18,10 @@ const app = express()
 const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
-const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+//const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+const DEFAULT_CHAT_TIME = 10 * 1000
+const HEARTBEAT_DELAY = 3 * 10000
+const MAX_ROUNDS = 2
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -37,6 +40,7 @@ const db = getFirestore(fApp)
 
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
+const gameOverEmitter = new EventEmitter()
 
 app.use(cookieParser())
 app.use(express.static('../webapp'))
@@ -119,17 +123,23 @@ async function getChatInfoOfPlayer(playerUID)
   }
 }
 
-function registerRoomUpdateCallback(roomId)
+function registerRoomCallbacks(roomId, expiryTime)
 {
   const roomFieldsRef = db.doc(`chat-room/${roomId}`)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
 
-  const gameOverEmitter = new EventEmitter()
+  const timeoutId = setTimeout(async () => {
+    await roomFieldsRef.set({
+      room_death_message: "Defeat: Ran out of time"
+    })
+    gameOverEmitter.emit(`${roomId}/game-over`)
+  }, expiryTime - Date.now())
 
-  const unsub = roomFieldsRef.onSnapshot(async (snapshot) => {
+  const unsubUpdateMessage = roomFieldsRef.onSnapshot(async (snapshot) => {
 
     const updatedTransitArray = snapshot.get("transit_messages")
     const roundVal = snapshot.get("round")
+    const expiresAt = snapshot.get("expiry_time")
 
     if (updatedTransitArray.length === 2)
     {
@@ -139,20 +149,25 @@ function registerRoomUpdateCallback(roomId)
       if (updatedTransitArray[0].text.toLocaleLowerCase() === updatedTransitArray[1].text.toLocaleLowerCase())
       {
         room_death_message = "Victory!"
+        clearTimeout(timeoutId)
       }
-      else if (roundVal >= 20)
+      else if (roundVal >= MAX_ROUNDS)
       {
         room_death_message = "Defeat: Out of rounds"
+        clearTimeout(timeoutId)
       }
-      else if (Date.now() > roomFieldsRef.get("expiry_time"))
+      else if (Date.now() > expiresAt)
       {
-        room_death_message = "Defeat: Time ran out"
+        // no need to do anything, as the timeout function should have fired, and 
+        // therefore prevent any more messages from being sent to the database, or other 
+        // clients from reading any more messages. 
+        // this code-block is mostly just a sanity check. 
+        return
       }
 
       await messagesRef.add(updatedTransitArray[0])
       updatedTransitArray[1].time++
       await messagesRef.add(updatedTransitArray[1])
-
 
       if (room_death_message)
       {
@@ -179,14 +194,23 @@ function registerRoomUpdateCallback(roomId)
 
       if (room_death_message)
       {
-        gameOverEmitter.emit("game-over")
+        gameOverEmitter.emit(`${roomId}/game-over`)
       }
     }
   })
 
-  gameOverEmitter.once('game-over', () => {
+  // TODO: uncomment this when we have delete player functionality. 
+  //const unsubDeleteRoom = roomFieldsRef.onSnapshot(async (snapshot) => {
+  //  const playerArray = snapshot.get("players")
+  //  if (playerArray.length === 0)
+  //  {
+  //    gameOverEmitter.emit(`${roomId}/delete-db`)
+  //  }
+  //})
+
+  gameOverEmitter.once(`${roomId}/game-over`, () => {
     console.log("unsubbing from update room listener")
-    unsub()
+    unsubUpdateMessage()
   })
 
 }
@@ -212,7 +236,6 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       res.send(error.message)
       return
     }
-
 
     const roomFieldsRef = await db.doc(`chat-room/${room_name}`).get()
     const deathMessage = roomFieldsRef.get("room_death_message")
@@ -243,14 +266,25 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       })
 
       res.write(`data: ${JSON.stringify(send_to)}\n\n`)
+    })
 
-      // TODO: somehow, within the snapshot, we need to figure out if the game on this 
-      // chatroom is over. 
+    const heartbeatId = setInterval(() => {
+      res.write("data: []\n\n")
 
+    }, HEARTBEAT_DELAY)
+
+    gameOverEmitter.once(`${room_name}/game-over`, () => {
+      clearInterval(heartbeatId)
+      res.end("data: game over\n\n")
     })
 
     req.on("close", () => {
-      console.log("unsubbing from get-chatroom snapshot")
+      console.log("connection closed. unsubbing from get-chatroom snapshot")
+      unsub()
+    })
+
+    req.on("end", () => {
+      console.log("client disconnected. unsubbing from get-chatroom snapshot")
       unsub()
     })
 
@@ -406,9 +440,16 @@ app.get('/api/start-game', (req, res) => {
 
     const registered = await isRegisteredPlayer(decoded.uid)
 
-    // TODO: add a function that will attempt to un-register a player. 
+    // TODO: call and invoke a function that will attempt to un-register a player. 
     // the function will return true if the player was part of a dead room, and was removed from it
     // Returns false if the player was part of an active chatroom, or no chatroom at all. 
+
+    const chatInfo = {
+      partnerName:"",
+      partnerEmail:"",
+      category:"",
+      expiresAt:-1
+    }
 
     if (!registered)
     {
@@ -416,14 +457,19 @@ app.get('/api/start-game', (req, res) => {
 
       if (findPartnerEmitter.listenerCount("find-partner") === 0)
       {
+
         let partnerFound = once(findPartnerEmitter, "find-partner")
         release()
-        const result = await partnerFound 
+        const partnerArgs = await partnerFound 
 
-        assert(result.length === 1, "Error: Expected exactly one chatroom id argument of type string")
-        assert(typeof(result[0]) === 'string', "Error: Expected exactly one chatroom id argument of type string")
+        assert(partnerArgs.length === 5, "Error: Expected five chatroom arguments")
+        assert(typeof(partnerArgs[0]) === 'string', "Error: Expected arg 0 to be a string")
+        assert(typeof(partnerArgs[1]) === 'string', "Error: Expected arg 1 to be a string")
+        assert(typeof(partnerArgs[2]) === 'string', "Error: Expected arg 2 to be a string")
+        assert(typeof(partnerArgs[3]) === 'string', "Error: Expected arg 3 to be a string")
+        assert(typeof(partnerArgs[4]) === 'number', "Error: Expected arg 4 to be a number")
 
-        await db.doc(`chat-room/${result[0]}`).update({
+        await db.doc(`chat-room/${partnerArgs[0]}`).update({
           players: FieldValue.arrayUnion(decoded.uid)
         })
 
@@ -431,19 +477,27 @@ app.get('/api/start-game', (req, res) => {
           email:decoded.email || "anonymous",
           uid:decoded.uid,
           name:decoded.name || "[Anonymous]",
-          room:result[0]
+          room:partnerArgs[0]
         })
+
+        chatInfo.partnerName = partnerArgs[1]
+        chatInfo.partnerEmail = partnerArgs[1]
+        chatInfo.category = partnerArgs[3]
+        chatInfo.expiresAt = partnerArgs[4]
+
+        findPartnerEmitter.emit(`${partnerArgs[0]}/partner-details`, decoded.name || '[Anonymous]', decoded.email || 'anonymous')
 
       }
       else if (findPartnerEmitter.listenerCount("find-partner") == 1)
       {
         const category = getRandomCategory()
+        const expiry_time = Date.now() + DEFAULT_CHAT_TIME
 
         const rv = await db.collection("chat-room").add({
           round: 1, 
           transit_messages: [],
           players: [decoded.uid],
-          expiry_time: Date.now() + DEFAULT_CHAT_TIME,
+          expiry_time,
           category,
           room_death_message: ""
         })
@@ -467,10 +521,20 @@ app.get('/api/start-game', (req, res) => {
           time: 2
         })
 
-        registerRoomUpdateCallback(rv.id)
-        findPartnerEmitter.emit("find-partner", rv.id)
-        assert(findPartnerEmitter.listenerCount("find-partner") === 0, "Error: Expected there to be no more listeners after emit.")
+        registerRoomCallbacks(rv.id, expiry_time)
+        findPartnerEmitter.emit("find-partner", rv.id, decoded.name || '[Anonymous]', decoded.email || 'anonymous', category, expiry_time)
         release()
+
+        const partnerDetails = await once(findPartnerEmitter, `${rv.id}/partner-details`)
+
+        assert(partnerDetails.length === 2, "Error: Expected 2 chatroom arguments")
+        assert(typeof(partnerDetails[0]) === 'string', "Error: Expected arg 0 to be a string")
+        assert(typeof(partnerDetails[1]) === 'string', "Error: Expected arg 1 to be a string")
+
+        chatInfo.category = category
+        chatInfo.expiresAt = expiry_time
+        chatInfo.partnerName= partnerDetails[0]
+        chatInfo.partnerEmail = partnerDetails[1]
       }
       else
       {
@@ -480,12 +544,17 @@ app.get('/api/start-game', (req, res) => {
         res.send("Error: Too many listeners on find partner callback")
         return
       }
+
+      res.statusCode = 200
+      res.send(chatInfo)
+      return 
     }
-
-    const chatInfo = await getChatInfoOfPlayer(decoded.uid)
-    res.statusCode = 200
-    res.send(chatInfo)
-
+    else
+    {
+      res.statusCode = 200
+      //res.send(await getChatInfoOfPlayer(decoded.uid))
+      res.send("")
+    }
 
   }).catch((error) => {
     res.statusCode = 401
