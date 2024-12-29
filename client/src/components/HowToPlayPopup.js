@@ -29,14 +29,28 @@ function HowToPlayPopup({isActive, setState}) {
         'You can only send one word at a time, alphabet characters only, non-empty messages, messages distinct from others previously submitted. You have 10 minutes, and 20 guesses.',
     ]
 
+    const leftPress = () => {
+        if (index > 0)
+        {
+            setIndex(index - 1)
+        }
+    }
+
+    const rightPress = () => {
+        if (index < images.length - 1)
+        {
+            setIndex(index + 1)
+        }
+    }
+
     const handleKeyDown = (event) => {
         if (event.key === "ArrowLeft")
         {
-            setIndex((((index - 1) % 5) + 5) % 5)
+            leftPress()
         }
         else if (event.key === "ArrowRight")
         {
-            setIndex( (index + 1) % 5)
+            rightPress()
         }
     }
 
@@ -57,7 +71,7 @@ function HowToPlayPopup({isActive, setState}) {
 
                     <i 
                         className="fa-solid fa-chevron-left popup-prev"
-                        onClick={() => setIndex((((index - 1) % 5) + 5) % 5)}
+                        onClick={leftPress}
                     />
 
                     <img
@@ -69,7 +83,7 @@ function HowToPlayPopup({isActive, setState}) {
 
                     <i 
                         className="fa-solid fa-chevron-right popup-next"
-                        onClick={() => setIndex( (index + 1) % 5)}
+                        onClick={rightPress}
                     />
 
                 </div>
