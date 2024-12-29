@@ -22,6 +22,7 @@ const MILLI_SECONDS_PER_MINUTE = 60_000
 const DEFAULT_CHAT_TIME = 10 * 1000
 const HEARTBEAT_DELAY = 3 * 10000
 const MAX_ROUNDS = 2
+const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -41,6 +42,7 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
+//const ceaseMessageEmitter = new EventEmitter()
 
 app.use(cookieParser())
 app.use(express.static('../webapp'))
@@ -129,10 +131,11 @@ function registerRoomCallbacks(roomId, expiryTime)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
 
   const timeoutId = setTimeout(async () => {
+
     await roomFieldsRef.set({
       room_death_message: "Defeat: Ran out of time"
     })
-    gameOverEmitter.emit(`${roomId}/game-over`)
+
   }, expiryTime - Date.now())
 
   const unsubUpdateMessage = roomFieldsRef.onSnapshot(async (snapshot) => {
@@ -141,9 +144,21 @@ function registerRoomCallbacks(roomId, expiryTime)
     const roundVal = snapshot.get("round")
     const expiresAt = snapshot.get("expiry_time")
 
+    const deathMessage = snapshot.get("room_death_message")
+
+    if (deathMessage)
+    {
+      await messagesRef.add({
+        text: deathMessage,
+        user: "server-first",
+        time: GAME_END_MESSAGE_TIME
+      })
+      gameOverEmitter.emit(`${roomId}/game-over`)
+      return
+    }
+
     if (updatedTransitArray.length === 2)
     {
-
       let room_death_message = ""
 
       if (updatedTransitArray[0].text.toLocaleLowerCase() === updatedTransitArray[1].text.toLocaleLowerCase())
@@ -174,7 +189,7 @@ function registerRoomCallbacks(roomId, expiryTime)
         await messagesRef.add({
           text: room_death_message,
           user: "server-first",
-          time: roundVal * 10 + 2
+          time: GAME_END_MESSAGE_TIME
         })
       }
       else
@@ -209,7 +224,6 @@ function registerRoomCallbacks(roomId, expiryTime)
   //})
 
   gameOverEmitter.once(`${roomId}/game-over`, () => {
-    console.log("unsubbing from update room listener")
     unsubUpdateMessage()
   })
 
@@ -258,6 +272,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       let send_to = []
 
       snapshot.forEach((data) => {
+
         send_to.push({
           "text":data.get("text"),
           "time":data.get("time"),
@@ -266,6 +281,7 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       })
 
       res.write(`data: ${JSON.stringify(send_to)}\n\n`)
+
     })
 
     const heartbeatId = setInterval(() => {
@@ -274,17 +290,17 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     }, HEARTBEAT_DELAY)
 
     gameOverEmitter.once(`${room_name}/game-over`, () => {
-      clearInterval(heartbeatId)
-      res.end("data: game over\n\n")
+      setTimeout(() => {
+        clearInterval(heartbeatId)
+        res.end("data: game over\n\n")
+      }, 2000)
     })
 
     req.on("close", () => {
-      console.log("connection closed. unsubbing from get-chatroom snapshot")
       unsub()
     })
 
     req.on("end", () => {
-      console.log("client disconnected. unsubbing from get-chatroom snapshot")
       unsub()
     })
 
@@ -303,7 +319,12 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     // one word, non-empty, a non-duplicate, ascii chars only.
 
-    if (typeof(str) === "undefined" || str === "")
+    if (typeof(str) !== "string")
+    {
+      return `Error: Wrong data type passed. Expected string, got ${typeof(str)}`
+    }
+
+    if (str === "")
     {
       return "Error: Message must not be empty";
     }
