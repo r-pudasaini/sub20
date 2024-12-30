@@ -59,6 +59,10 @@ a {
   user-select: none;
 }
 
+.jersey-15 {
+  font-family: "Jersey 15", sans-serif;
+}
+
 .jersey-15-regular {
   font-family: "Jersey 15", sans-serif;
   font-weight: 400;

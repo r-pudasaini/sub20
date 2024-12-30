@@ -8,23 +8,45 @@ import { Chatroom } from "../contexts/ChatroomContext";
 import { Login } from "../contexts/LoginContext";
 import {jwtDecode} from 'jwt-decode'
 import Countdown from 'react-countdown';
+import HowToPlayPopup from "./HowToPlayPopup";
 
+const ChatStates = {
+  YOUR_TURN:"YOUR_TURN",
+  PENDING: "PENDING",
+  DEAD: "DEAD"
+}
+
+const placeholders = {
+  "YOUR_TURN":"type something here",
+  "PENDING":"waiting for partner",
+  "DEAD":"room is dead. Thanks for playing!"
+}
 
 function Chat() {
 
-  const {chatDetails} = useContext(Chatroom)
+  const {chatDetails, setChatDetails} = useContext(Chatroom)
 
   const [message, setMessage] = useState("")
-  const [allMessages, setAllMessages] = useState([])
+  const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")
+  const [allMessages, setAllMessages] = useState(chatDetails.messages || [])
+  const [popup, setPopup] = useState(false)
 
   const {loginCookie} = useContext(Login)
 
-  // get the time field of allMessages, divide by 10, add 1. This is the round number. 
-  // if this number ever gets past 20, the game is over. 
-
   const [userInfo, setUserInfo] = useState({})
+  const [roomState, setRoomState] = useState(chatDetails.state)
+
+  useEffect(() => {
+
+    setChatDetails({...chatDetails, messages: allMessages, state: roomState, copyMessage: transitMessage})
+
+  }, [roomState, allMessages, setChatDetails, copyMessage])
 
   const navigate = useNavigate()
+
+  const getClassForState = () => {
+    return roomState === ChatStates.DEAD ? "chat-dead-room" : "chat-message-window"
+  }
 
   const getMessageType = (uid) => {
 
@@ -73,6 +95,7 @@ function Chat() {
       return m2.time - m1.time
     })
 
+    setRoomState(ChatStates.YOUR_TURN)
     setAllMessages(messageArray)
   }
 
@@ -80,7 +103,7 @@ function Chat() {
 
     if (!loginCookie)
     {
-      navigate('error/401')
+      navigate('/error/401')
       return
     }
 
@@ -100,12 +123,18 @@ function Chat() {
 
       if (alert.data === '[]')
       {
-        console.log("got heartbeat message")
         return
       }
       else if (alert.data === 'game over')
       {
+        // TODO: navigate to the game over page, passing the messages as a prop, or a context. 
         evtSource.close()
+        return
+      }
+      else if (alert.data === 'dead room')
+      {
+        evtSource.close()
+        setRoomState(ChatStates.DEAD)
         return
       }
 
@@ -119,11 +148,18 @@ function Chat() {
   }, [loginCookie, navigate])
 
   const handleSubmit = (e) => {
+
     e.preventDefault()
 
-    const copyMessage = String(message)
+    if (roomState !== ChatStates.YOUR_TURN)
+    {
+      return
+    }
 
-    const errorMessage = isValidMessage(copyMessage)
+    const dup = String(message)
+
+    const errorMessage = isValidMessage(dup)
+    setCopyMessage(dup)
 
     if (errorMessage)
     {
@@ -131,9 +167,10 @@ function Chat() {
       return;
     }
 
-    axios.post('/api/send-chatroom-message', {"message":copyMessage}).then((response) => {
+    axios.post('/api/send-chatroom-message', {"message":dup}).then((_) => {
 
       setMessage("")
+      setRoomState(ChatStates.PENDING)
 
     }).catch((error) => {
 
@@ -153,58 +190,126 @@ function Chat() {
         toast.error("Failed to connect. Please try again later")
         navigate('/')
       }
-
     })
 
   }
 
+  const buttonClass = () => {
+    return roomState === ChatStates.YOUR_TURN ? "chat-button" : ""
+  }
 
   return (
-    <div className="center-contents-horizontal center-contents-vertical flex-col chat-container">
-      <div className="chat-body flex-col">
+    <div className="chat-top-container flex-row">
 
-        <div className="chat-header">
-
-          <div className="chat-partner-info">
-            <div>Chatting with: {chatDetails.partnerName}</div>
-          </div>
-
-          <div className="chat-countdown">
-            <div>Time Left:</div>
-            <Countdown date={chatDetails.expiresAt} />
-          </div>
-
+      {
+        roomState === ChatStates.YOUR_TURN &&
+        <div className="jersey-15 chat-side-text-positive">
+          Your Turn!
         </div>
+      }
 
-        <div className="chat-message-window">
-          {
-            allMessages.map((mess, index) => {
-              return (
-                <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
-                  {mess.text}
+      {
+        roomState === ChatStates.PENDING &&
+        <div className="jersey-15 chat-side-text-neutral">
+          Waiting for Partner
+        </div>
+      }
+
+      <div className="center-contents-horizontal center-contents-vertical flex-col chat-container">
+        <div className="chat-body flex-col">
+
+          <div className="chat-header">
+
+            <div className="chat-partner-info">
+              <div>Chatting with: {chatDetails.partnerName}</div>
+            </div>
+
+            <div className="chat-countdown">
+              <div>Time Left:</div>
+              <Countdown date={chatDetails.expiresAt} />
+            </div>
+
+          </div>
+
+          <div className={getClassForState()}>
+            {
+              roomState !== ChatStates.DEAD &&
+              allMessages.map((mess, index) => {
+                return (
+                  <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
+                    {mess.text}
+                  </div>
+                )
+              })
+            }
+
+            {
+              roomState === ChatStates.DEAD &&
+              <div className="flex-col center-contents-vertical">
+
+                <div className="chat-dead-message jersey-15">
+                  The game in this room is over. 
                 </div>
-              )
-            })
 
-          }
+                <div className="chat-play-again jersey-15 button"
+                  onClick={() => navigate('/start-game')}
+                >
+                  Play again 
+                </div>
+
+              </div>
+            }
+          </div>
         </div>
+
+        <form 
+          className="chat-form flex-row"
+        >
+          <input
+            className="chat-input"
+            placeholder={placeholders[roomState]}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={roomState !== ChatStates.YOUR_TURN}
+            value={message}
+          />
+          <button
+            onClick={handleSubmit}
+            className={buttonClass()}
+            disabled={roomState !== ChatStates.YOUR_TURN}
+          >
+            <i className="fa-solid fa-share"/>
+          </button>
+        </form>
+
+        <div 
+          className="chat-rules-popup"
+          onClick={() => setPopup(true)}
+        >
+          Rules
+        </div>
+
+        <HowToPlayPopup isActive={popup} setState={setPopup} />
+
       </div>
 
+      {
+        roomState === ChatStates.YOUR_TURN && 
+        <div className="jersey-15 chat-side-text-positive">
+          Send a Message!
+        </div>
+      }
 
-      <form 
-        className="chat-form flex-row"
-        onSubmit={handleSubmit}
-      >
-        <input
-          className="chat-input"
-          placeholder="type your message here"
-          onChange={(e) => setMessage(e.target.value)}
-          value={message}
-        />
-        <button className="chat-button button" type="submit">
-          <i className="fa-solid fa-share"></i>
-        </button>
-      </form>
+      {
+        roomState === ChatStates.PENDING && 
+        <div className="flex-col center-contents-horizontal center-text">
+          <div className="jersey-15 chat-side-text-neutral">
+            Your message: 
+          </div>
+          <div className="jersey-15 chat-side-text-guess">
+            {copyMessage}
+          </div>
+        </div>
+      }
 
     </div>
   )

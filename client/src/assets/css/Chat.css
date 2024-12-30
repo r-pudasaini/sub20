@@ -1,11 +1,15 @@
 
+.chat-top-container > * {
+  margin-left : auto;
+  margin-right: auto;
+}
 
 .chat-body {
-  width : 60%;
   border: 1px solid white;
   border-radius: 10px;
   margin-top : 1rem;
   margin-bottom : 0.5rem;
+  width: 100%;
 }
 
 .chat-header {
@@ -20,8 +24,61 @@
   align-items: center;
 }
 
+.chat-side-text-neutral {
+
+  font-size: 38px;
+  color : gold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width : 10vw;
+  text-align: center;
+  word-wrap: break-word;
+}
+
+::placeholder {
+  color : black;
+  opacity: 1;
+}
+
+.chat-input {
+  background-color: white;
+}
+
+.chat-side-text-guess {
+  font-size: 28px;
+  width: 10vw;
+  word-wrap: break-word;
+
+}
+
+.chat-side-text-positive {
+
+  font-size: 38px;
+  color : lime;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width : 10vw;
+  text-align: center;
+}
+
 .chat-partner-info {
   margin-right: auto;
+}
+
+.chat-container {
+  width : 60vw;
+}
+
+.chat-rules-popup {
+  color : gray;
+  margin-bottom : 2rem;
+  text-decoration: underline;
+}
+
+.chat-rules-popup:hover {
+  cursor: pointer;
 }
 
 .chat-countdown {
@@ -39,12 +96,42 @@
   flex-direction: column-reverse;
 }
 
+.chat-dead-room {
+  margin-top : 1rem;
+  margin-bottom : 0.5rem;
+  height : 90vh;
+  width : 100%;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.chat-dead-message {
+  background-color: var(--vim-red);
+  padding : 1rem;
+  word-wrap: break-word;
+  margin-bottom: 1rem;
+  font-size: 23px;
+  text-align: center;
+}
+
+.chat-play-again {
+  background-color:lime;
+  font-size: 23px;
+  padding : 0.5rem 1.5rem;
+  color : black;
+  text-align: center;
+  word-wrap: break-word;
+  border-radius: 10px;
+  width: fit-content;
+}
+
 .chat-message-window:first-child {
   padding-top : 0.5rem;
 }
 
 .chat-form {
-  width : 60%;
+  width : 100%;
 }
 
 .chat-message-element {
@@ -88,8 +175,11 @@
 
 
 .chat-form {
-  width : 60vw;
   margin-bottom: 2rem;
+}
+
+.chat-button:hover {
+  cursor: pointer;
 }
 
 
@@ -107,6 +197,18 @@
 .chat-form button {
   width : 4rem;
   border-radius: 0 10px 10px 0;
+}
+
+@media (max-width : 900px) {
+  .chat-side-text-neutral {
+    display: none;
+  }
+  .chat-side-text-positive {
+    display: none;
+  }
+  .chat-side-text-guess {
+    display: none;
+  }
 }
 
 @media (max-width : 500px) {

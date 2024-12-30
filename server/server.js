@@ -18,8 +18,8 @@ const app = express()
 const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
-//const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
-const DEFAULT_CHAT_TIME = 10 * 1000
+const DEFAULT_CHAT_TIME = 2 * MILLI_SECONDS_PER_MINUTE
+//const DEFAULT_CHAT_TIME = 30 * 1000
 const HEARTBEAT_DELAY = 3 * 10000
 const MAX_ROUNDS = 2
 const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
@@ -42,7 +42,6 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
-//const ceaseMessageEmitter = new EventEmitter()
 
 app.use(cookieParser())
 app.use(express.static('../webapp'))
@@ -256,8 +255,12 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     
     if (deathMessage)
     {
-      res.statusCode = 400
-      res.send(`The game in this room is over. Please join another room.`)
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      })
+      res.end(`data: dead room\n\n`)
       return
     }
 
@@ -289,6 +292,10 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 
     }, HEARTBEAT_DELAY)
 
+
+    // memory leak: repeatedly refreshing the chatroom page will fill the game over emitter 
+    // with all these listeners, which is BAD. 
+    // we need to unregister this listener when if the user disconnects. 
     gameOverEmitter.once(`${room_name}/game-over`, () => {
       setTimeout(() => {
         clearInterval(heartbeatId)
@@ -469,7 +476,9 @@ app.get('/api/start-game', (req, res) => {
       partnerName:"",
       partnerEmail:"",
       category:"",
-      expiresAt:-1
+      expiresAt:-1,
+      state:"YOUR_TURN",
+      messages:[],
     }
 
     if (!registered)
@@ -502,7 +511,7 @@ app.get('/api/start-game', (req, res) => {
         })
 
         chatInfo.partnerName = partnerArgs[1]
-        chatInfo.partnerEmail = partnerArgs[1]
+        chatInfo.partnerEmail = partnerArgs[2]
         chatInfo.category = partnerArgs[3]
         chatInfo.expiresAt = partnerArgs[4]
 
