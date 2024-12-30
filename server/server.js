@@ -18,10 +18,10 @@ const app = express()
 const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
-//const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
-const DEFAULT_CHAT_TIME = 10 * 1000
+const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+//const DEFAULT_CHAT_TIME = 10 * 1000
 const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
-const MAX_ROUNDS = 20
+const MAX_ROUNDS = 2
 const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
 
@@ -42,6 +42,7 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
+gameOverEmitter.setMaxListeners(0)
 
 app.use(cookieParser())
 app.use(express.static('../webapp'))
@@ -631,6 +632,62 @@ app.get('/api/start-game', (req, res) => {
     res.send(`Authentication failed: ${error}`)
   })
   
+})
+
+
+app.get('/api/unregister-player', (req, res) => {
+
+  if (typeof(req.cookies.auth_token) === "undefined")
+  {
+    res.statusCode = 401
+    res.end("Authentication Failed: No auth_token provided")
+    return
+  }
+
+  auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
+
+    const playerQuery = db.collection("players/").where("uid", '==', decoded.uid)
+    const playerData = await playerQuery.get()
+
+    if (playerData.docs.length === 0)
+    {
+      res.statusCode = 403
+      res.send("Player is not part of a chatroom")
+      return
+    }
+    else if (playerData.docs.length > 1)
+    {
+      res.statusCode = 500
+      res.send("Player is part of many chatrooms")
+      return
+    }
+
+    const roomName = playerData.docs[0].get("room")
+
+    if (!roomName) 
+    {
+      res.statusCode = 403
+      res.send("Player is not part of a chatroom")
+      return
+    }
+
+    //await db.doc(`chat-room/${roomName}/`).update({
+    //  "players": FieldValue.arrayRemove(decoded.uid)
+    //})
+    // TODO: replace this with a call to mutating some other field, like incrementing a counter
+    // and having a snapshot respond when the counter hits two. 
+    // removing the player from the players field like this causes bugs, and possibly UB. 
+
+    await db.doc(`players/${playerData.docs[0].id}`).delete()
+
+    res.statusCode = 200
+    res.send("")
+
+  }).catch((error) => {
+    res.statusCode = 401
+    res.end(`Authentication failed: ${error}`)
+  })
+
 })
 
 // redirect 404 errors to the client for them to route

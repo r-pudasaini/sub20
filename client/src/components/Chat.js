@@ -100,12 +100,26 @@ function Chat() {
   }
 
   const startNewGame = () => {
-    // TODO: make an API call that will unregister a player (from a dead room)
-    // when the API call successfully returns, we will clear the chat details context (by setting it to an empty object)
-    // and then navigating to the start game endpoint. 
 
+    axios.get('/api/unregister-player').then((_) => {
 
-    // we will handle any errors as we normally do. 
+      setChatDetails({})
+      navigate('/start-game')
+
+    }).catch((error) => {
+
+      if (error.status >= 400 && error.status < 500)
+      {
+        navigate(`/error/${error.status}`)
+      }
+      else
+      {
+        toast.error("Failed to connect. Check console for details")
+        console.log(error)
+        navigate('/')
+      }
+    })
+
   }
 
   useEffect(() => {
@@ -188,7 +202,7 @@ function Chat() {
 
     if (errorMessage)
     {
-      toast.error(errorMessage)
+      toast.error(`${dup} is invalid: ${errorMessage}`)
       return;
     }
 
