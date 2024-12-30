@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import '../assets/css/global.css'
 import '../assets/css/Chat.css'
-import { toast } from "react-toastify";
+import { toast, Zoom } from "react-toastify";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Chatroom } from "../contexts/ChatroomContext";
@@ -9,6 +9,7 @@ import { Login } from "../contexts/LoginContext";
 import {jwtDecode} from 'jwt-decode'
 import Countdown from 'react-countdown';
 import HowToPlayPopup from "./HowToPlayPopup";
+import Confetti from 'react-confetti'
 
 const ChatStates = {
   YOUR_TURN:"YOUR_TURN",
@@ -25,18 +26,17 @@ const placeholders = {
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
-
-  const [message, setMessage] = useState("")
-  const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")
-  const [allMessages, setAllMessages] = useState(chatDetails.messages || [])
-  const [popup, setPopup] = useState(false)
-
   const {loginCookie} = useContext(Login)
 
-  const [userInfo, setUserInfo] = useState({})
-  const [roomState, setRoomState] = useState(chatDetails.state)
-  //const [roomState, setRoomState] = useState(ChatStates.DEAD)
+  const [message, setMessage] = useState("")  // the message as we type it 
+  const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
+  const [allMessages, setAllMessages] = useState(chatDetails.messages || [])  // an array of all the messages in the room 
+  const [popup, setPopup] = useState(false) // the rules popup 
 
+
+  const [userInfo, setUserInfo] = useState({})  // information of the logged in user according to the login cookie
+  const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
+  const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
 
   useEffect(() => {
 
@@ -103,6 +103,7 @@ function Chat() {
     // when the API call successfully returns, we will clear the chat details context (by setting it to an empty object)
     // and then navigating to the start game endpoint. 
 
+
     // we will handle any errors as we normally do. 
   }
 
@@ -136,11 +137,19 @@ function Chat() {
       else if (alert.data.startsWith('game over/'))
       {
         const deathMessage = alert.data.substring('game over/'.length)
-        console.log(deathMessage)
-        toast.success(deathMessage, {
-          position : "top-center",
-          autoClose : 2500,
+
+        toast(<div className="chat-toast-contents jersey-15">{deathMessage}</div>, {
+          className : "chat-game-end",
+          autoClose : false,
+          theme : "light",
+          closeButton : false,
+          transition : Zoom,
         })
+
+        if (deathMessage === 'Victory!')
+        {
+          setVictory(true)
+        }
 
         setRoomState(ChatStates.DEAD)
         evtSource.close()
@@ -290,7 +299,7 @@ function Chat() {
 
         {
           roomState === ChatStates.DEAD &&
-          <div className="chat-play-again jersey-15 button"
+          <div className="chat-play-again jersey-15 button unselectable"
             onClick={startNewGame}
           >
             Play again 
@@ -325,6 +334,11 @@ function Chat() {
             {copyMessage}
           </div>
         </div>
+      }
+
+      {
+        victory && 
+        <Confetti recycle={false} numberOfPieces={3000} initialVelocityY={30} tweenDuration={100000}/>
       }
 
     </div>

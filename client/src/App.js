@@ -4,7 +4,7 @@ import Game from './components/Game'
 import ErrorPage from './components/ErrorPage'
 import Chat from './components/Chat'
 import 'react-toastify/dist/ReactToastify.css'
-import {Flip, ToastContainer} from 'react-toastify'
+import {ToastContainer, Flip} from 'react-toastify'
 
 
 import {
@@ -27,7 +27,7 @@ function App() {
         <Route path="*" element={<ErrorPage />}/>
       </Routes>
       <ToastContainer
-        position="bottom-right"
+        position="top-center"
         autoClose={1000}
         hideProgressBar={true}
         stacked={true}

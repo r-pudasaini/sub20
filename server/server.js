@@ -18,9 +18,10 @@ const app = express()
 const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
-const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+//const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+const DEFAULT_CHAT_TIME = 10 * 1000
 const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
-const MAX_ROUNDS = 2
+const MAX_ROUNDS = 20
 const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
 
