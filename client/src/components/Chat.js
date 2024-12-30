@@ -38,7 +38,7 @@ function Chat() {
 
   useEffect(() => {
 
-    setChatDetails({...chatDetails, messages: allMessages, state: roomState, copyMessage: transitMessage})
+    setChatDetails({...chatDetails, messages: allMessages, state: roomState, transitMessage: copyMessage})
 
   }, [roomState, allMessages, setChatDetails, copyMessage])
 
@@ -138,7 +138,13 @@ function Chat() {
         return
       }
 
-      sortAndSetMessages(JSON.parse(alert.data))
+      const incomingArr = JSON.parse(alert.data)
+
+      if (incomingArr.length > allMessages.length)
+      {
+        sortAndSetMessages(incomingArr)
+      }
+
     })
 
     return () => {
