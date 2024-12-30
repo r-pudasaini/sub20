@@ -172,7 +172,7 @@ function registerRoomCallbacks(roomId, expiryTime)
 
   const timeoutId = setTimeout(async () => {
 
-    await roomFieldsRef.set({
+    await roomFieldsRef.update({
       room_death_message: "Defeat: Ran out of time"
     })  // this will trigger the snapshot below: 
 
