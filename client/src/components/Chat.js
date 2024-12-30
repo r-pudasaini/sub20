@@ -23,6 +23,7 @@ const placeholders = {
   "DEAD":"room is dead. Thanks for playing!"
 }
 
+
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
@@ -30,7 +31,7 @@ function Chat() {
 
   const [message, setMessage] = useState("")  // the message as we type it 
   const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
-  const [allMessages, setAllMessages] = useState(chatDetails.messages || [])  // an array of all the messages in the room 
+  const [allMessages, setAllMessages] = useState( (chatDetails.messages || []).sort( (m1, m2) => m2.time - m1.time))  // an array of all the messages in the room 
   const [popup, setPopup] = useState(false) // the rules popup 
 
 
