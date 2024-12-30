@@ -18,9 +18,8 @@ const app = express()
 const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
-const DEFAULT_CHAT_TIME = 2 * MILLI_SECONDS_PER_MINUTE
-//const DEFAULT_CHAT_TIME = 30 * 1000
-const HEARTBEAT_DELAY = 3 * 10000
+const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
+const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
 const MAX_ROUNDS = 2
 const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
@@ -90,7 +89,7 @@ async function getPlayerChatroomName(player)
 
   if (!room_name) 
   {
-    throw {code:500, msg:"Player is part of many chatrooms"}
+    throw {code:403, msg:"Player is not part of a chatroom"}
   }
 
   return room_name
@@ -128,6 +127,11 @@ function registerRoomCallbacks(roomId, expiryTime)
 {
   const roomFieldsRef = db.doc(`chat-room/${roomId}`)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
+
+  // TODO: DO NOT ADD A MESSAGE INDICATING THE GAME IS OVER 
+  // instead, we will pass the death message to the gameove emitter, 
+  // and allow the get message handler to signal that the game is over, and 
+  // what caused the game to end. 
 
   const timeoutId = setTimeout(async () => {
 
@@ -260,7 +264,8 @@ app.get('/api/get-chatroom-messages', (req, res) => {
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       })
-      res.end(`data: dead room\n\n`)
+
+      res.end(`data: game over\n\n`)
       return
     }
 
@@ -289,15 +294,12 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 
     const heartbeatId = setInterval(() => {
       res.write("data: []\n\n")
-
     }, HEARTBEAT_DELAY)
 
 
     const terminateConnection = () => {
-      setTimeout(() => {
-        clearInterval(heartbeatId)
-        res.end("data: game over\n\n")
-      }, 2000)
+      clearInterval(heartbeatId)
+      res.end("data: game over\n\n")
     }
 
     gameOverEmitter.once(`${room_name}/game-over`, terminateConnection)
@@ -467,11 +469,12 @@ app.get('/api/start-game', (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
+    const release = await emitterLock.acquire()
     const registered = await isRegisteredPlayer(decoded.uid)
 
-    // TODO: call and invoke a function that will attempt to un-register a player. 
-    // the function will return true if the player was part of a dead room, and was removed from it
-    // Returns false if the player was part of an active chatroom, or no chatroom at all. 
+    // TODO: run the logic of isRegisteredPlayer ourselves. 
+    // if the player exists in the DB, but they do not have an assigned chat-room, then 
+    // this was a spurious request, and we must send a 400 error. 
 
     const chatInfo = {
       partnerName:"",
@@ -484,21 +487,15 @@ app.get('/api/start-game', (req, res) => {
 
     if (!registered)
     {
-      const release = await emitterLock.acquire()
 
       if (findPartnerEmitter.listenerCount("find-partner") === 0)
       {
 
+        // TODO: write to the DB of our player name, email, and UID, but no chatroom field. 
+
         let partnerFound = once(findPartnerEmitter, "find-partner")
         release()
         const partnerArgs = await partnerFound 
-
-        assert(partnerArgs.length === 5, "Error: Expected five chatroom arguments")
-        assert(typeof(partnerArgs[0]) === 'string', "Error: Expected arg 0 to be a string")
-        assert(typeof(partnerArgs[1]) === 'string', "Error: Expected arg 1 to be a string")
-        assert(typeof(partnerArgs[2]) === 'string', "Error: Expected arg 2 to be a string")
-        assert(typeof(partnerArgs[3]) === 'string', "Error: Expected arg 3 to be a string")
-        assert(typeof(partnerArgs[4]) === 'number', "Error: Expected arg 4 to be a number")
 
         await db.doc(`chat-room/${partnerArgs[0]}`).update({
           players: FieldValue.arrayUnion(decoded.uid)
@@ -521,6 +518,7 @@ app.get('/api/start-game', (req, res) => {
       }
       else if (findPartnerEmitter.listenerCount("find-partner") == 1)
       {
+
         const category = getRandomCategory()
         const expiry_time = Date.now() + DEFAULT_CHAT_TIME
 
@@ -558,10 +556,6 @@ app.get('/api/start-game', (req, res) => {
 
         const partnerDetails = await once(findPartnerEmitter, `${rv.id}/partner-details`)
 
-        assert(partnerDetails.length === 2, "Error: Expected 2 chatroom arguments")
-        assert(typeof(partnerDetails[0]) === 'string', "Error: Expected arg 0 to be a string")
-        assert(typeof(partnerDetails[1]) === 'string', "Error: Expected arg 1 to be a string")
-
         chatInfo.category = category
         chatInfo.expiresAt = expiry_time
         chatInfo.partnerName= partnerDetails[0]
@@ -582,8 +576,10 @@ app.get('/api/start-game', (req, res) => {
     }
     else
     {
+      release()
       res.statusCode = 200
       //res.send(await getChatInfoOfPlayer(decoded.uid))
+      // TODO: send the actual chat info, and not just an empty object. 
       res.send("")
     }
 

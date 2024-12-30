@@ -35,6 +35,8 @@ function Chat() {
 
   const [userInfo, setUserInfo] = useState({})
   const [roomState, setRoomState] = useState(chatDetails.state)
+  //const [roomState, setRoomState] = useState(ChatStates.DEAD)
+
 
   useEffect(() => {
 
@@ -44,9 +46,6 @@ function Chat() {
 
   const navigate = useNavigate()
 
-  const getClassForState = () => {
-    return roomState === ChatStates.DEAD ? "chat-dead-room" : "chat-message-window"
-  }
 
   const getMessageType = (uid) => {
 
@@ -99,6 +98,14 @@ function Chat() {
     setAllMessages(messageArray)
   }
 
+  const startNewGame = () => {
+    // TODO: make an API call that will unregister a player (from a dead room)
+    // when the API call successfully returns, we will clear the chat details context (by setting it to an empty object)
+    // and then navigating to the start game endpoint. 
+
+    // we will handle any errors as we normally do. 
+  }
+
   useEffect(() => {
 
     if (!loginCookie)
@@ -123,18 +130,13 @@ function Chat() {
 
       if (alert.data === '[]')
       {
+        // heartbeat data to ensure the connection lives over 10 minutes 
         return
       }
       else if (alert.data === 'game over')
       {
-        // TODO: navigate to the game over page, passing the messages as a prop, or a context. 
-        evtSource.close()
-        return
-      }
-      else if (alert.data === 'dead room')
-      {
-        evtSource.close()
         setRoomState(ChatStates.DEAD)
+        evtSource.close()
         return
       }
 
@@ -232,14 +234,20 @@ function Chat() {
 
             <div className="chat-countdown">
               <div>Time Left:</div>
-              <Countdown date={chatDetails.expiresAt} />
+              {
+                roomState !== ChatStates.DEAD && 
+                <Countdown date={chatDetails.expiresAt} />
+              }
+              {
+                roomState === ChatStates.DEAD && 
+                <div>Game Over</div>
+              }
             </div>
 
           </div>
 
-          <div className={getClassForState()}>
+          <div className="chat-message-window">
             {
-              roomState !== ChatStates.DEAD &&
               allMessages.map((mess, index) => {
                 return (
                   <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
@@ -248,44 +256,39 @@ function Chat() {
                 )
               })
             }
-
-            {
-              roomState === ChatStates.DEAD &&
-              <div className="flex-col center-contents-vertical">
-
-                <div className="chat-dead-message jersey-15">
-                  The game in this room is over. 
-                </div>
-
-                <div className="chat-play-again jersey-15 button"
-                  onClick={() => navigate('/start-game')}
-                >
-                  Play again 
-                </div>
-
-              </div>
-            }
           </div>
         </div>
 
-        <form 
-          className="chat-form flex-row"
-        >
-          <input
-            className="chat-input"
-            placeholder={placeholders[roomState]}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={roomState !== ChatStates.YOUR_TURN}
-            value={message}
-          />
-          <button
-            onClick={handleSubmit}
-            className={buttonClass()}
-            disabled={roomState !== ChatStates.YOUR_TURN}
+        {
+          roomState !== ChatStates.DEAD && 
+          <form 
+            className={"chat-form "}
           >
-            <i className="fa-solid fa-share"/>
-          </button>
-        </form>
+            <input
+              className="chat-input"
+              placeholder={placeholders[roomState]}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={roomState !== ChatStates.YOUR_TURN}
+              value={message}
+            />
+            <button
+              onClick={handleSubmit}
+              className={buttonClass()}
+              disabled={roomState !== ChatStates.YOUR_TURN}
+            >
+              <i className="fa-solid fa-share"/>
+            </button>
+          </form>
+        }
+
+        {
+          roomState === ChatStates.DEAD &&
+          <div className="chat-play-again jersey-15 button"
+            onClick={startNewGame}
+          >
+            Play again 
+          </div>
+        }
 
         <div 
           className="chat-rules-popup"
