@@ -106,11 +106,49 @@ async function getChatInfoOfPlayer(playerUID)
     return uid !== playerUID
   })
 
+  const deathMessage = roomData.get("room_death_message")
+  let state
+  let transitMessage
+
+  if (deathMessage)
+  {
+    state = "DEAD"
+  }
+  else
+  {
+
+    const transitArr = roomData.get("transit_messages")
+
+    if (transitArr.length === 0 || transitArr[0].user !== playerUID)
+    {
+      state = "YOUR_TURN"
+    }
+    else
+    {
+      state = "PENDING"
+      transitMessage = transitArr[0].text
+    }
+  }
+
+
+  const messagesRef = await db.collection(`chat-room/${roomName}/messages`).get()
+
+  const messages = []
+
+  messagesRef.docs.forEach((data) => {
+    messages.push({
+      "text":data.get("text"),
+      "time":data.get("time"),
+      "user":data.get("user")
+    })
+  })
+
   assert(partnerUID, "Error expected partnerName to be a defined value")
 
   const partnerDocs = await db.collection('players').where("uid", "==", partnerUID).get()
 
   assert(partnerDocs.docs.length === 1, "Expected exactly one partner to be available")
+
 
   const partnerName = partnerDocs.docs[0].get("name")
   const partnerEmail = partnerDocs.docs[0].get("email")
@@ -119,7 +157,10 @@ async function getChatInfoOfPlayer(playerUID)
     partnerName,
     partnerEmail,
     category:roomData.get('category'),
-    expiresAt:roomData.get('expiry_time')
+    expiresAt:roomData.get('expiry_time'),
+    state,
+    transitMessage,
+    messages
   }
 }
 
@@ -484,6 +525,7 @@ app.get('/api/start-game', (req, res) => {
       category:"",
       expiresAt:-1,
       state:"YOUR_TURN",
+      messages: []
     }
 
     if (!registered)
@@ -579,8 +621,8 @@ app.get('/api/start-game', (req, res) => {
     {
       release()
       res.statusCode = 200
-      //res.send(await getChatInfoOfPlayer(decoded.uid))
-      res.send("")
+      res.send(await getChatInfoOfPlayer(decoded.uid))
+      //res.send("")
     }
 
   }).catch((error) => {
