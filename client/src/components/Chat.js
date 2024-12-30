@@ -133,8 +133,15 @@ function Chat() {
         // heartbeat data to ensure the connection lives over 10 minutes 
         return
       }
-      else if (alert.data === 'game over')
+      else if (alert.data.startsWith('game over/'))
       {
+        const deathMessage = alert.data.substring('game over/'.length)
+        console.log(deathMessage)
+        toast.success(deathMessage, {
+          position : "top-center",
+          autoClose : 2500,
+        })
+
         setRoomState(ChatStates.DEAD)
         evtSource.close()
         return

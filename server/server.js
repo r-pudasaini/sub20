@@ -85,14 +85,14 @@ async function getPlayerChatroomName(player)
     throw {code:500, msg:"Player is part of many chatrooms"}
   }
 
-  const room_name = player_data.docs[0].get("room")
+  const roomName = player_data.docs[0].get("room")
 
-  if (!room_name) 
+  if (!roomName) 
   {
     throw {code:403, msg:"Player is not part of a chatroom"}
   }
 
-  return room_name
+  return roomName
 }
 
 // MUST BE CALLED ON REGISTERED PLAYERS ONLY
@@ -128,16 +128,11 @@ function registerRoomCallbacks(roomId, expiryTime)
   const roomFieldsRef = db.doc(`chat-room/${roomId}`)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
 
-  // TODO: DO NOT ADD A MESSAGE INDICATING THE GAME IS OVER 
-  // instead, we will pass the death message to the gameove emitter, 
-  // and allow the get message handler to signal that the game is over, and 
-  // what caused the game to end. 
-
   const timeoutId = setTimeout(async () => {
 
     await roomFieldsRef.set({
       room_death_message: "Defeat: Ran out of time"
-    })
+    })  // this will trigger the snapshot below: 
 
   }, expiryTime - Date.now())
 
@@ -151,27 +146,27 @@ function registerRoomCallbacks(roomId, expiryTime)
 
     if (deathMessage)
     {
-      await messagesRef.add({
-        text: deathMessage,
-        user: "server-first",
-        time: GAME_END_MESSAGE_TIME
-      })
-      gameOverEmitter.emit(`${roomId}/game-over`)
+      //await messagesRef.add({
+      //  text: deathMessage,
+      //  user: "server-first",
+      //  time: GAME_END_MESSAGE_TIME
+      //})
+      gameOverEmitter.emit(`${roomId}/game-over`, deathMessage)
       return
     }
 
     if (updatedTransitArray.length === 2)
     {
-      let room_death_message = ""
+      let roomDeathMessage = ""
 
       if (updatedTransitArray[0].text.toLocaleLowerCase() === updatedTransitArray[1].text.toLocaleLowerCase())
       {
-        room_death_message = "Victory!"
+        roomDeathMessage = "Victory!"
         clearTimeout(timeoutId)
       }
       else if (roundVal >= MAX_ROUNDS)
       {
-        room_death_message = "Defeat: Out of rounds"
+        roomDeathMessage = "Defeat: Out of rounds"
         clearTimeout(timeoutId)
       }
       else if (Date.now() > expiresAt)
@@ -187,15 +182,7 @@ function registerRoomCallbacks(roomId, expiryTime)
       updatedTransitArray[1].time++
       await messagesRef.add(updatedTransitArray[1])
 
-      if (room_death_message)
-      {
-        await messagesRef.add({
-          text: room_death_message,
-          user: "server-first",
-          time: GAME_END_MESSAGE_TIME
-        })
-      }
-      else
+      if (!roomDeathMessage)
       {
         await messagesRef.add({
           text: `Round ${roundVal + 1}`,
@@ -207,12 +194,12 @@ function registerRoomCallbacks(roomId, expiryTime)
       await db.doc(`chat-room/${roomId}`).update({
         transit_messages: [],
         round : FieldValue.increment(1),
-        room_death_message
+        room_death_message : roomDeathMessage
       })
 
-      if (room_death_message)
+      if (roomDeathMessage)
       {
-        gameOverEmitter.emit(`${roomId}/game-over`)
+        gameOverEmitter.emit(`${roomId}/game-over`, roomDeathMessage)
       }
     }
   })
@@ -243,10 +230,10 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    let room_name
+    let roomName
 
     try {
-      room_name = await getPlayerChatroomName(decoded.uid)
+      roomName = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
       res.status = error.code
@@ -254,8 +241,10 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       return
     }
 
-    const roomFieldsRef = await db.doc(`chat-room/${room_name}`).get()
+    const roomFieldsRef = await db.doc(`chat-room/${roomName}`).get()
     const deathMessage = roomFieldsRef.get("room_death_message")
+
+    const messagesQuery = db.collection(`chat-room/${roomName}/messages`)
     
     if (deathMessage)
     {
@@ -265,7 +254,20 @@ app.get('/api/get-chatroom-messages', (req, res) => {
         'Connection': 'keep-alive',
       })
 
-      res.end(`data: game over\n\n`)
+      const messagesRef = await messagesQuery.get()
+
+      const sendTo = []
+
+      messagesRef.docs.forEach((data) => {
+        sendTo.push({
+          "text":data.get("text"),
+          "time":data.get("time"),
+          "user":data.get("user")
+        })
+      })
+
+      res.write(`data: ${JSON.stringify(sendTo)}\n\n`)
+      res.end(`data: game over/${deathMessage}\n\n`)
       return
     }
 
@@ -275,20 +277,20 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       'Connection': 'keep-alive',
     });
 
-    const unsub = db.collection(`chat-room/${room_name}/messages`).onSnapshot((snapshot) => {
+    const unsub = messagesQuery.onSnapshot((snapshot) => {
 
-      let send_to = []
+      let sendTo= []
 
       snapshot.forEach((data) => {
 
-        send_to.push({
+        sendTo.push({
           "text":data.get("text"),
           "time":data.get("time"),
           "user":data.get("user")
         })
       })
 
-      res.write(`data: ${JSON.stringify(send_to)}\n\n`)
+      res.write(`data: ${JSON.stringify(sendTo)}\n\n`)
 
     })
 
@@ -297,20 +299,20 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     }, HEARTBEAT_DELAY)
 
 
-    const terminateConnection = () => {
+    const terminateConnection = (updatedDeathMessage) => {
       clearInterval(heartbeatId)
-      res.end("data: game over\n\n")
+      res.end(`data: game over/${updatedDeathMessage}\n\n`)
     }
 
-    gameOverEmitter.once(`${room_name}/game-over`, terminateConnection)
+    gameOverEmitter.once(`${roomName}/game-over`, terminateConnection)
 
     req.on("close", () => {
-      gameOverEmitter.removeListener(`${room_name}/game-over`, terminateConnection)
+      gameOverEmitter.removeListener(`${roomName}/game-over`, terminateConnection)
       unsub()
     })
 
     req.on("end", () => {
-      gameOverEmitter.removeListener(`${room_name}/game-over`, terminateConnection)
+      gameOverEmitter.removeListener(`${roomName}/game-over`, terminateConnection)
       unsub()
     })
 
@@ -360,10 +362,10 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
-    let room_name
+    let roomName 
 
     try {
-      room_name = await getPlayerChatroomName(decoded.uid)
+      roomName = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
       res.status = error.code
@@ -373,8 +375,8 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
     const message2send = req.body.message
 
-    const messagesRef = db.collection(`chat-room/${room_name}/messages`)
-    const roomFieldsRef = db.doc(`chat-room/${room_name}`)
+    const messagesRef = db.collection(`chat-room/${roomName}/messages`)
+    const roomFieldsRef = db.doc(`chat-room/${roomName}`)
     const chatRef = await roomFieldsRef.get()
     const roundVal = chatRef.get("round")
     const data = await messagesRef.get()
@@ -482,7 +484,6 @@ app.get('/api/start-game', (req, res) => {
       category:"",
       expiresAt:-1,
       state:"YOUR_TURN",
-      messages:[],
     }
 
     if (!registered)
@@ -579,7 +580,6 @@ app.get('/api/start-game', (req, res) => {
       release()
       res.statusCode = 200
       //res.send(await getChatInfoOfPlayer(decoded.uid))
-      // TODO: send the actual chat info, and not just an empty object. 
       res.send("")
     }
 
