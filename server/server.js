@@ -293,21 +293,22 @@ app.get('/api/get-chatroom-messages', (req, res) => {
     }, HEARTBEAT_DELAY)
 
 
-    // memory leak: repeatedly refreshing the chatroom page will fill the game over emitter 
-    // with all these listeners, which is BAD. 
-    // we need to unregister this listener when if the user disconnects. 
-    gameOverEmitter.once(`${room_name}/game-over`, () => {
+    const terminateConnection = () => {
       setTimeout(() => {
         clearInterval(heartbeatId)
         res.end("data: game over\n\n")
       }, 2000)
-    })
+    }
+
+    gameOverEmitter.once(`${room_name}/game-over`, terminateConnection)
 
     req.on("close", () => {
+      gameOverEmitter.removeListener(`${room_name}/game-over`, terminateConnection)
       unsub()
     })
 
     req.on("end", () => {
+      gameOverEmitter.removeListener(`${room_name}/game-over`, terminateConnection)
       unsub()
     })
 
