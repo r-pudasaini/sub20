@@ -62,17 +62,6 @@ async function isRegisteredPlayer(player)
   return player_data.docs.length !== 0
 }
 
-async function unregister(player, isRegistered)
-{
-  // TODO: 
-  // 1. check the player's chatroom in the DB
-  // 2. in that chatroom record, remove the player from the players entry array
-  // 3. in the register room update callback, add a snapshot that will 
-  // delete the chatroom when both players remove themselves from the players entry array
-  // when this operation is done, the snapshot must unsub itself. 
-
-}
-
 async function getPlayerChatroomName(player)
 {
   const players = db.collection("players/").where("uid", '==', player)
@@ -248,13 +237,14 @@ function registerRoomCallbacks(roomId, expiryTime)
   })
 
   // TODO: uncomment this when we have delete player functionality. 
-  //const unsubDeleteRoom = roomFieldsRef.onSnapshot(async (snapshot) => {
-  //  const playerArray = snapshot.get("players")
-  //  if (playerArray.length === 0)
-  //  {
-  //    gameOverEmitter.emit(`${roomId}/delete-db`)
-  //  }
-  //})
+  const unsubDeleteRoom = roomFieldsRef.onSnapshot(async (snapshot) => {
+    const numGone = snapshot.get("num_disconnected")
+    if (numGone === 2)
+    {
+      console.log("deleting the chatroom now")
+      unsubDeleteRoom()
+    }
+  })
 
   gameOverEmitter.once(`${roomId}/game-over`, () => {
     unsubUpdateMessage()
@@ -483,6 +473,8 @@ app.get('/api/chat-info', (req, res) => {
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
     const registered = await isRegisteredPlayer(decoded.uid)
+    // TODO: make sure isRegisteredPlayer also ensures the player is part of a chatroom
+    // i.e. their chatroom field is present, and they have not left the room
 
     if (!registered)
     {
@@ -515,11 +507,53 @@ app.get('/api/start-game', (req, res) => {
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
 
     const release = await emitterLock.acquire()
-    const registered = await isRegisteredPlayer(decoded.uid)
 
-    // TODO: run the logic of isRegisteredPlayer ourselves. 
-    // if the player exists in the DB, but they do not have an assigned chat-room, then 
-    // this was a spurious request, and we must send a 400 error. 
+    const players = db.collection("players/").where("uid", '==', decoded.uid)
+    const playerData = await players.get()
+
+    let needsNewRoom
+    let waitingForRoom
+    let playerDocId 
+
+    if (playerData.docs.length === 1)
+    {
+      const playerInRoom = !playerData.docs[0].get("left_room")
+      const hasChatRoom = playerData.docs[0].get("room")
+      playerDocId = playerData.docs[0].id
+
+      assert(!(!hasChatRoom && playerInRoom), "Error: Expected player without a chatroom to have left it.")
+
+      if (hasChatRoom && !playerInRoom)
+      {
+        await db.doc(`players/${playerDocId}`).update({
+          room:FieldValue.delete()
+        })
+      }
+
+      needsNewRoom = hasChatRoom && !playerInRoom
+      waitingForRoom = !hasChatRoom && !playerInRoom
+    }
+    else if (playerData.docs.length === 0)
+    {
+      // player is not registered, and never has been before. So we need to 
+      // make a player ref right here and work with it. 
+
+      const rv = await db.collection("players/").add({
+        email:decoded.email || "anonymous",
+        uid:decoded.uid,
+        name:decoded.name || "[Anonymous]",
+        left_room:false
+      })
+
+      playerDocId = rv.id
+      needsNewRoom = true
+      waitingForRoom = false
+    }
+    else {
+      release()
+      res.statusCode = 500
+      res.send("Server Error: Player is part of many rooms")
+    }
 
     const chatInfo = {
       partnerName:"",
@@ -530,15 +564,12 @@ app.get('/api/start-game', (req, res) => {
       messages: []
     }
 
-    if (!registered)
+    if (needsNewRoom)
     {
-
       if (findPartnerEmitter.listenerCount("find-partner") === 0)
       {
 
-        // TODO: write to the DB of our player name, email, and UID, but no chatroom field. 
-
-        let partnerFound = once(findPartnerEmitter, "find-partner")
+        const partnerFound = once(findPartnerEmitter, "find-partner")
         release()
         const partnerArgs = await partnerFound 
 
@@ -546,11 +577,9 @@ app.get('/api/start-game', (req, res) => {
           players: FieldValue.arrayUnion(decoded.uid)
         })
 
-        await db.collection('players/').add({
-          email:decoded.email || "anonymous",
-          uid:decoded.uid,
-          name:decoded.name || "[Anonymous]",
-          room:partnerArgs[0]
+        await db.doc(`players/${playerDocId}`).update({
+          room:partnerArgs[0],
+          left_room : false,
         })
 
         chatInfo.partnerName = partnerArgs[1]
@@ -565,22 +594,21 @@ app.get('/api/start-game', (req, res) => {
       {
 
         const category = getRandomCategory()
-        const expiry_time = Date.now() + DEFAULT_CHAT_TIME
+        const expiryTime = Date.now() + DEFAULT_CHAT_TIME
 
         const rv = await db.collection("chat-room").add({
           round: 1, 
           transit_messages: [],
           players: [decoded.uid],
-          expiry_time,
+          expiry_time : expiryTime,
           category,
-          room_death_message: ""
+          room_death_message: "",
+          num_disconnected : 0
         })
 
-        await db.collection('players/').add({
-          email:decoded.email || "anonymous",
-          uid:decoded.uid,
-          name:decoded.name || "[Anonymous]",
-          room:rv.id
+        await db.doc(`players/${playerDocId}`).update({
+          room:rv.id,
+          left_room : false,
         })
 
         await db.collection(`chat-room/${rv.id}/messages`).add({
@@ -595,14 +623,14 @@ app.get('/api/start-game', (req, res) => {
           time: 2
         })
 
-        registerRoomCallbacks(rv.id, expiry_time)
-        findPartnerEmitter.emit("find-partner", rv.id, decoded.name || '[Anonymous]', decoded.email || 'anonymous', category, expiry_time)
+        registerRoomCallbacks(rv.id, expiryTime)
+        findPartnerEmitter.emit("find-partner", rv.id, decoded.name || '[Anonymous]', decoded.email || 'anonymous', category, expiryTime)
         release()
 
         const partnerDetails = await once(findPartnerEmitter, `${rv.id}/partner-details`)
 
         chatInfo.category = category
-        chatInfo.expiresAt = expiry_time
+        chatInfo.expiresAt = expiryTime 
         chatInfo.partnerName= partnerDetails[0]
         chatInfo.partnerEmail = partnerDetails[1]
       }
@@ -619,12 +647,35 @@ app.get('/api/start-game', (req, res) => {
       res.send(chatInfo)
       return 
     }
-    else
+    else if (waitingForRoom)
+    {
+      assert(findPartnerEmitter.listenerCount('find-partner') === 1, "Error, expected exactly one listener in find partner.")
+      findPartnerEmitter.removeAllListeners('find-partner')
+      const partnerFound = once(findPartnerEmitter, "find-partner")
+      release()
+      const partnerArgs = await partnerFound 
+
+      await db.doc(`chat-room/${partnerArgs[0]}`).update({
+        players: FieldValue.arrayUnion(decoded.uid)
+      })
+
+      await db.doc(`players/${playerDocId}`).update({
+        room:partnerArgs[0],
+        left_room : false,
+      })
+
+      chatInfo.partnerName = partnerArgs[1]
+      chatInfo.partnerEmail = partnerArgs[2]
+      chatInfo.category = partnerArgs[3]
+      chatInfo.expiresAt = partnerArgs[4]
+
+      findPartnerEmitter.emit(`${partnerArgs[0]}/partner-details`, decoded.name || '[Anonymous]', decoded.email || 'anonymous')
+    }
+    else 
     {
       release()
       res.statusCode = 200
       res.send(await getChatInfoOfPlayer(decoded.uid))
-      //res.send("")
     }
 
   }).catch((error) => {
@@ -671,14 +722,13 @@ app.get('/api/unregister-player', (req, res) => {
       return
     }
 
-    //await db.doc(`chat-room/${roomName}/`).update({
-    //  "players": FieldValue.arrayRemove(decoded.uid)
-    //})
-    // TODO: replace this with a call to mutating some other field, like incrementing a counter
-    // and having a snapshot respond when the counter hits two. 
-    // removing the player from the players field like this causes bugs, and possibly UB. 
+    await db.doc(`chat-room/${roomName}/`).update({
+      num_disconnected : FieldValue.increment(1)
+    })
 
-    await db.doc(`players/${playerData.docs[0].id}`).delete()
+    await db.doc(`players/${playerData.docs[0].id}`).update({
+      left_room : true
+    })
 
     res.statusCode = 200
     res.send("")
