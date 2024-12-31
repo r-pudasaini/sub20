@@ -181,6 +181,7 @@ function Chat() {
     })
 
     return () => {
+      toast.dismiss()
       evtSource.close()
     }
 

@@ -4,7 +4,6 @@ import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
 import {useNavigate} from 'react-router-dom'
 import axios from 'axios'
-import { toast } from 'react-toastify'
 import {Chatroom} from '../contexts/ChatroomContext'
 
 function Game() {
@@ -26,8 +25,6 @@ function Game() {
 
     // if the user does not belong to a chatroom, they will be placed into a Queue until another player joins the room with them. 
     // when a partner player is found, the user will be directed to the chatroom page. 
-
-    toast.dismiss()
 
     axios.get('/api/start-game').then((response) => {
 
