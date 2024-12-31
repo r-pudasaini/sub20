@@ -21,7 +21,7 @@ const MILLI_SECONDS_PER_MINUTE = 60_000
 const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
 //const DEFAULT_CHAT_TIME = 10 * 1000
 const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
-const MAX_ROUNDS = 2
+const MAX_ROUNDS = 5
 const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
 
@@ -132,7 +132,6 @@ async function getChatInfoOfPlayer(playerUID)
     }
   }
 
-
   const messagesRef = await db.collection(`chat-room/${roomName}/messages`).get()
 
   const messages = []
@@ -150,7 +149,6 @@ async function getChatInfoOfPlayer(playerUID)
   const partnerDocs = await db.collection('players').where("uid", "==", partnerUID).get()
 
   assert(partnerDocs.docs.length === 1, "Expected exactly one partner to be available")
-
 
   const partnerName = partnerDocs.docs[0].get("name")
   const partnerEmail = partnerDocs.docs[0].get("email")
@@ -527,7 +525,8 @@ app.get('/api/start-game', (req, res) => {
       category:"",
       expiresAt:-1,
       state:"YOUR_TURN",
-      messages: []
+      messages: [],
+      transitMessage: "",
     }
 
     if (!registered)
