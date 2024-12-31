@@ -4,18 +4,13 @@ import '../assets/css/Chat.css'
 import { toast, Zoom } from "react-toastify";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Chatroom } from "../contexts/ChatroomContext";
+import { Chatroom, ChatStates, initialChatroomValue } from "../contexts/ChatroomContext";
 import { Login } from "../contexts/LoginContext";
 import {jwtDecode} from 'jwt-decode'
 import Countdown from 'react-countdown';
 import HowToPlayPopup from "./HowToPlayPopup";
 import Confetti from 'react-confetti'
 
-const ChatStates = {
-  YOUR_TURN:"YOUR_TURN",
-  PENDING: "PENDING",
-  DEAD: "DEAD"
-}
 
 const placeholders = {
   "YOUR_TURN":"type something here",
@@ -23,30 +18,19 @@ const placeholders = {
   "DEAD":"room is dead. Thanks for playing!"
 }
 
-
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
   const {loginCookie} = useContext(Login)
 
   const [message, setMessage] = useState("")  // the message as we type it 
-  const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
-  const [allMessages, setAllMessages] = useState( (chatDetails.messages || []).sort( (m1, m2) => m2.time - m1.time))  // an array of all the messages in the room 
+
   const [popup, setPopup] = useState(false) // the rules popup 
+  const [userInfo, setUserInfo] = useState({})  // ****** TRY MOVING TO LOGIN CONTEXT ******
 
-
-  const [userInfo, setUserInfo] = useState({})  // information of the logged in user according to the login cookie
-  const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
   const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
 
-  useEffect(() => {
-
-    setChatDetails({...chatDetails, messages: allMessages, state: roomState, transitMessage: copyMessage})
-
-  }, [roomState, allMessages, setChatDetails, copyMessage])
-
   const navigate = useNavigate()
-
 
   const getMessageType = (uid) => {
 
@@ -79,7 +63,7 @@ function Chat() {
       return "Error: Invalid Characters detected in message"
     }
 
-    let lowercaseArr = allMessages.map((msg) => {
+    let lowercaseArr = chatDetails.messages.map((msg) => {
       return msg.text.toLocaleLowerCase()
     })
 
@@ -95,15 +79,14 @@ function Chat() {
       return m2.time - m1.time
     })
 
-    setRoomState(ChatStates.YOUR_TURN)
-    setAllMessages(messageArray)
+    setChatDetails({...chatDetails, state:ChatStates.YOUR_TURN, messages:messageArray})
   }
 
   const startNewGame = () => {
 
     axios.get('/api/unregister-player').then((_) => {
 
-      setChatDetails({})
+      setChatDetails(initialChatroomValue)
       navigate('/start-game')
 
     }).catch((error) => {
@@ -166,14 +149,14 @@ function Chat() {
           setVictory(true)
         }
 
-        setRoomState(ChatStates.DEAD)
+        setChatDetails({...chatDetails, state: ChatStates.DEAD})
         evtSource.close()
         return
       }
 
       const incomingArr = JSON.parse(alert.data)
 
-      if (incomingArr.length > allMessages.length)
+      if (incomingArr.length > chatDetails.messages.length)
       {
         sortAndSetMessages(incomingArr)
       }
@@ -182,15 +165,16 @@ function Chat() {
 
     return () => {
       evtSource.close()
+      toast.dismiss()  // on component unmount, we clear any potential game over toasts on the page. 
     }
 
-  }, [loginCookie, navigate])
+  }, [loginCookie, navigate, setChatDetails, sortAndSetMessages])
 
   const handleSubmit = (e) => {
 
     e.preventDefault()
 
-    if (roomState !== ChatStates.YOUR_TURN)
+    if (chatDetails.state !== ChatStates.YOUR_TURN)
     {
       return
     }
@@ -198,7 +182,6 @@ function Chat() {
     const dup = String(message)
 
     const errorMessage = isValidMessage(dup)
-    setCopyMessage(dup)
 
     if (errorMessage)
     {
@@ -206,10 +189,13 @@ function Chat() {
       return;
     }
 
+    chatDetails.transitMessage = dup
+    setChatDetails({...chatDetails, transitMessage:dup})
+
     axios.post('/api/send-chatroom-message', {"message":dup}).then((_) => {
 
       setMessage("")
-      setRoomState(ChatStates.PENDING)
+      setChatDetails({...chatDetails, state:ChatStates.PENDING})
 
     }).catch((error) => {
 
@@ -234,21 +220,21 @@ function Chat() {
   }
 
   const buttonClass = () => {
-    return roomState === ChatStates.YOUR_TURN ? "chat-button" : ""
+    return chatDetails.state === ChatStates.YOUR_TURN ? "chat-button" : ""
   }
 
   return (
     <div className="chat-top-container flex-row">
 
       {
-        roomState === ChatStates.YOUR_TURN &&
+        chatDetails.state === ChatStates.YOUR_TURN &&
         <div className="jersey-15 chat-side-text-positive">
           Your Turn!
         </div>
       }
 
       {
-        roomState === ChatStates.PENDING &&
+        chatDetails.state === ChatStates.PENDING &&
         <div className="jersey-15 chat-side-text-neutral">
           Waiting for Partner
         </div>
@@ -266,11 +252,11 @@ function Chat() {
             <div className="chat-countdown">
               <div>Time Left:</div>
               {
-                roomState !== ChatStates.DEAD && 
+                chatDetails.state !== ChatStates.DEAD && 
                 <Countdown date={chatDetails.expiresAt} />
               }
               {
-                roomState === ChatStates.DEAD && 
+                chatDetails.state === ChatStates.DEAD && 
                 <div>Game Over</div>
               }
             </div>
@@ -279,7 +265,7 @@ function Chat() {
 
           <div className="chat-message-window">
             {
-              allMessages.map((mess, index) => {
+              chatDetails.messages.map((mess, index) => {
                 return (
                   <div className={"chat-message-element " + getMessageType(mess.user)} key={index}>
                     {mess.text}
@@ -291,21 +277,21 @@ function Chat() {
         </div>
 
         {
-          roomState !== ChatStates.DEAD && 
+          chatDetails.state !== ChatStates.DEAD && 
           <form 
             className={"chat-form "}
           >
             <input
               className="chat-input"
-              placeholder={placeholders[roomState]}
+              placeholder={placeholders[chatDetails.state]}
               onChange={(e) => setMessage(e.target.value)}
-              disabled={roomState !== ChatStates.YOUR_TURN}
+              disabled={chatDetails.state !== ChatStates.YOUR_TURN}
               value={message}
             />
             <button
               onClick={handleSubmit}
               className={buttonClass()}
-              disabled={roomState !== ChatStates.YOUR_TURN}
+              disabled={chatDetails.state !== ChatStates.YOUR_TURN}
             >
               <i className="fa-solid fa-share"/>
             </button>
@@ -313,7 +299,7 @@ function Chat() {
         }
 
         {
-          roomState === ChatStates.DEAD &&
+          chatDetails.state === ChatStates.DEAD &&
           <div className="chat-play-again jersey-15 button unselectable"
             onClick={startNewGame}
           >
@@ -333,20 +319,20 @@ function Chat() {
       </div>
 
       {
-        roomState === ChatStates.YOUR_TURN && 
+        chatDetails.state === ChatStates.YOUR_TURN && 
         <div className="jersey-15 chat-side-text-positive">
           Send a Message!
         </div>
       }
 
       {
-        roomState === ChatStates.PENDING && 
+        chatDetails.state === ChatStates.PENDING && 
         <div className="flex-col center-contents-horizontal center-text">
           <div className="jersey-15 chat-side-text-neutral">
             Your message: 
           </div>
           <div className="jersey-15 chat-side-text-guess">
-            {copyMessage}
+            {chatDetails.transitMessage}
           </div>
         </div>
       }
