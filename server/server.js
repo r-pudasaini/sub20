@@ -19,10 +19,8 @@ const port = 10201
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
 const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
-//const DEFAULT_CHAT_TIME = 10 * 1000
 const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
 const MAX_ROUNDS = 2
-const GAME_END_MESSAGE_TIME = (MAX_ROUNDS + 2) * 10
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -42,6 +40,7 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
+findPartnerEmitter.setMaxListeners(1)
 gameOverEmitter.setMaxListeners(0)
 
 app.use(cookieParser())
@@ -511,48 +510,33 @@ app.get('/api/start-game', (req, res) => {
     const players = db.collection("players/").where("uid", '==', decoded.uid)
     const playerData = await players.get()
 
-    let needsNewRoom
-    let waitingForRoom
-    let playerDocId 
+    let playerToRoomStatus
+    let playerDocId
 
     if (playerData.docs.length === 1)
     {
-      const playerInRoom = !playerData.docs[0].get("left_room")
-      const hasChatRoom = playerData.docs[0].get("room")
+      playerToRoomStatus = playerData.docs[0].get('game_state')
+      assert(typeof(playerToRoomStatus) !== "undefined", "Error: expected a value for game state variable.")
       playerDocId = playerData.docs[0].id
-
-      assert(!(!hasChatRoom && playerInRoom), "Error: Expected player without a chatroom to have left it.")
-
-      if (hasChatRoom && !playerInRoom)
-      {
-        await db.doc(`players/${playerDocId}`).update({
-          room:FieldValue.delete()
-        })
-      }
-
-      needsNewRoom = hasChatRoom && !playerInRoom
-      waitingForRoom = !hasChatRoom && !playerInRoom
     }
     else if (playerData.docs.length === 0)
     {
-      // player is not registered, and never has been before. So we need to 
-      // make a player ref right here and work with it. 
-
       const rv = await db.collection("players/").add({
         email:decoded.email || "anonymous",
         uid:decoded.uid,
         name:decoded.name || "[Anonymous]",
-        left_room:false
+        game_state : "NEW_PLAYER"
       })
 
+      playerToRoomStatus = "NEW_PLAYER"
       playerDocId = rv.id
-      needsNewRoom = true
-      waitingForRoom = false
     }
     else {
+      console.log("Server Error: Player is part of too many rooms")
       release()
       res.statusCode = 500
       res.send("Server Error: Player is part of many rooms")
+      return
     }
 
     const chatInfo = {
@@ -564,10 +548,14 @@ app.get('/api/start-game', (req, res) => {
       messages: []
     }
 
-    if (needsNewRoom)
+    if (playerToRoomStatus === "NEW_PLAYER")
     {
       if (findPartnerEmitter.listenerCount("find-partner") === 0)
       {
+
+        await db.doc(`players/${playerDocId}`).update({
+          game_state : "WAITING"
+        })
 
         const partnerFound = once(findPartnerEmitter, "find-partner")
         release()
@@ -579,7 +567,7 @@ app.get('/api/start-game', (req, res) => {
 
         await db.doc(`players/${playerDocId}`).update({
           room:partnerArgs[0],
-          left_room : false,
+          game_state : "IN_ROOM"
         })
 
         chatInfo.partnerName = partnerArgs[1]
@@ -608,7 +596,7 @@ app.get('/api/start-game', (req, res) => {
 
         await db.doc(`players/${playerDocId}`).update({
           room:rv.id,
-          left_room : false,
+          game_state : "IN_ROOM",
         })
 
         await db.collection(`chat-room/${rv.id}/messages`).add({
@@ -625,9 +613,10 @@ app.get('/api/start-game', (req, res) => {
 
         registerRoomCallbacks(rv.id, expiryTime)
         findPartnerEmitter.emit("find-partner", rv.id, decoded.name || '[Anonymous]', decoded.email || 'anonymous', category, expiryTime)
-        release()
 
         const partnerDetails = await once(findPartnerEmitter, `${rv.id}/partner-details`)
+        release() // deferring the release here is necessary since the user may try to refresh the page WHILE we are waiting for 
+        // the other player to emit the findPartnerEmitter. 
 
         chatInfo.category = category
         chatInfo.expiresAt = expiryTime 
@@ -637,6 +626,7 @@ app.get('/api/start-game', (req, res) => {
       else
       {
         // throw an internal server error
+        console.log(`Got: ${findPartnerEmitter.listenerCount('find-partner')} listeners on the find-partner channel.`)
         release()
         res.statusCode = 500
         res.send("Error: Too many listeners on find partner callback")
@@ -647,7 +637,7 @@ app.get('/api/start-game', (req, res) => {
       res.send(chatInfo)
       return 
     }
-    else if (waitingForRoom)
+    else if (playerToRoomStatus === "WAITING")
     {
       assert(findPartnerEmitter.listenerCount('find-partner') === 1, "Error, expected exactly one listener in find partner.")
       findPartnerEmitter.removeAllListeners('find-partner')
@@ -661,7 +651,7 @@ app.get('/api/start-game', (req, res) => {
 
       await db.doc(`players/${playerDocId}`).update({
         room:partnerArgs[0],
-        left_room : false,
+        game_state : "IN_ROOM"
       })
 
       chatInfo.partnerName = partnerArgs[1]
@@ -670,12 +660,20 @@ app.get('/api/start-game', (req, res) => {
       chatInfo.expiresAt = partnerArgs[4]
 
       findPartnerEmitter.emit(`${partnerArgs[0]}/partner-details`, decoded.name || '[Anonymous]', decoded.email || 'anonymous')
+      res.statusCode = 200
+      res.send(chatInfo)
     }
-    else 
+    else if (playerToRoomStatus === "IN_ROOM")
     {
       release()
       res.statusCode = 200
       res.send(await getChatInfoOfPlayer(decoded.uid))
+    }
+    else
+    {
+      release()
+      res.statusCode = 500
+      res.send("Error: Got an invalid game state from the database. Please contact the server owner for assistiance")
     }
 
   }).catch((error) => {
@@ -713,6 +711,8 @@ app.get('/api/unregister-player', (req, res) => {
       return
     }
 
+    // TODO: make sure the room is not dead. If the room is dead the PLAYER IS NOT ALLOWED TO LEAVE 
+
     const roomName = playerData.docs[0].get("room")
 
     if (!roomName) 
@@ -722,12 +722,22 @@ app.get('/api/unregister-player', (req, res) => {
       return
     }
 
+    const roomFields = await db.doc(`chat-room/${roomName}/`).get()
+    const deathMessage = roomFields.get('room_death_message')
+
+    if (!deathMessage)
+    {
+      res.statusCode = 403
+      res.send("Your room is still alive. You are not allowed to unregister.")
+      return
+    }
+
     await db.doc(`chat-room/${roomName}/`).update({
       num_disconnected : FieldValue.increment(1)
     })
 
     await db.doc(`players/${playerData.docs[0].id}`).update({
-      left_room : true
+      game_state : "NEW_PLAYER"
     })
 
     res.statusCode = 200
