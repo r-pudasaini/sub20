@@ -8,3 +8,4 @@ Cargo.lock
 /server/.env
 /server/private_key.json
 /server/categories.js
+/server/webapp

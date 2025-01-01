@@ -43,7 +43,7 @@ const gameOverEmitter = new EventEmitter()
 gameOverEmitter.setMaxListeners(0)
 
 app.use(cookieParser())
-app.use(express.static('../webapp'))
+app.use(express.static('./webapp'))
 
 app.use(cors())
 
@@ -774,7 +774,7 @@ app.get('/api/unregister-player', (req, res) => {
 
 // redirect 404 errors to the client for them to route
 app.use((req, res, next) => { 
-  res.status(404).sendFile('index.html', {root: '../webapp/'})
+  res.status(404).sendFile('index.html', {root: './webapp/'})
 }) 
 
 app.listen(port, () => {
