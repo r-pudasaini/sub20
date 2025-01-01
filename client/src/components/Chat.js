@@ -71,12 +71,12 @@ function Chat() {
 
     if (typeof(str) === "undefined" || str === "")
     {
-      return "Error: Messages must not be empty"
+      return "Message is empty"
     }
 
     if (!(/^[a-zA-Z]+$/.test(str)))
     {
-      return "Error: Invalid Characters detected in message"
+      return `Invalid Characters in ${str}. See Rules`
     }
 
     let lowercaseArr = allMessages.map((msg) => {
@@ -85,7 +85,7 @@ function Chat() {
 
     if (lowercaseArr.includes(str.toLocaleLowerCase()))
     {
-      return `Error: ${str} has already been sent` 
+      return `${str} has already been sent` 
     }
   }
 
@@ -97,6 +97,27 @@ function Chat() {
 
     setRoomState(ChatStates.YOUR_TURN)
     setAllMessages(messageArray)
+  }
+
+  const leaveRoom = () => {
+    axios.get('/api/unregister-player').then((_) => {
+
+      setChatDetails({})
+      navigate('/')
+
+    }).catch((error) => {
+
+      if (error.status >= 400 && error.status < 500)
+      {
+        navigate(`/error/${error.status}`)
+      }
+      else
+      {
+        toast.error("Failed to connect. Check console for details")
+        console.log(error)
+        navigate('/')
+      }
+    })
   }
 
   const startNewGame = () => {
@@ -140,7 +161,7 @@ function Chat() {
       return
     }
 
-    const evtSource = new EventSource("http://localhost:8080/api/get-chatroom-messages");
+    const evtSource = new EventSource("/api/get-chatroom-messages");
 
     evtSource.addEventListener("message", (alert) => {
 
@@ -203,7 +224,7 @@ function Chat() {
 
     if (errorMessage)
     {
-      toast.error(`${dup} is invalid: ${errorMessage}`)
+      toast.error(`${errorMessage}`)
       return;
     }
 
@@ -315,19 +336,30 @@ function Chat() {
 
         {
           roomState === ChatStates.DEAD &&
-          <div className="chat-play-again jersey-15 button unselectable"
-            onClick={startNewGame}
-          >
-            Play again 
+          <div className="flex-row">
+            <div className="chat-leave jersey-15 button unselectable"
+              onClick={leaveRoom}
+            >
+              Leave 
+            </div>
+
+            <div className="chat-play-again jersey-15 button unselectable"
+              onClick={startNewGame}
+            >
+              Play again 
+            </div>
           </div>
         }
 
-        <div 
-          className="chat-rules-popup"
-          onClick={() => setPopup(true)}
-        >
-          Rules
-        </div>
+        {
+          roomState !== ChatStates.DEAD &&
+          <div 
+            className="chat-rules-popup"
+            onClick={() => setPopup(true)}
+          >
+            Rules
+          </div>
+        }
 
         <HowToPlayPopup isActive={popup} setState={setPopup} />
 
