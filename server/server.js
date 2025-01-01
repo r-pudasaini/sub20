@@ -284,8 +284,8 @@ app.get('/api/get-chatroom-messages', (req, res) => {
       roomName = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
-      res.status = error.code
-      res.send(error.message)
+      res.statusCode = error.code
+      res.end(`data: ${error.msg}`)
       return
     }
 
@@ -416,7 +416,7 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       roomName = await getPlayerChatroomName(decoded.uid)
     }
     catch (error) {
-      res.status = error.code
+      res.statusCode = error.code
       res.send(error.message)
       return
     }

@@ -31,13 +31,13 @@ function Chat() {
 
   const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
   const [allMessages, setAllMessages] = useState( (chatDetails.messages || []).sort( (m1, m2) => m2.time - m1.time))  // an array of all the messages in the room 
-  const [popup, setPopup] = useState(false) // the rules popup 
+  const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
 
 
   const [message, setMessage] = useState("")  // the message as we type it 
   const [userInfo, setUserInfo] = useState({})  // information of the logged in user according to the login cookie
-  const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
   const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
+  const [popup, setPopup] = useState(false) // the rules popup 
 
   useEffect(() => {
 
@@ -162,6 +162,10 @@ function Chat() {
     }
 
     const evtSource = new EventSource("/api/get-chatroom-messages");
+
+    evtSource.addEventListener('error', (error) => {
+      console.log(error)
+    })
 
     evtSource.addEventListener("message", (alert) => {
 
