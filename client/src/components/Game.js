@@ -4,6 +4,7 @@ import '../assets/css/Game.css'
 import MoonLoader from 'react-spinners/MoonLoader'
 import {useNavigate} from 'react-router-dom'
 import axios from 'axios'
+import { toast } from 'react-toastify'
 import {Chatroom} from '../contexts/ChatroomContext'
 
 function Game() {

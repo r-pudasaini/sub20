@@ -1,4 +1,3 @@
-
 const express = require('express')
 const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
@@ -7,20 +6,20 @@ const { initializeApp, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const serviceAccount = require('./private_key.json');
-const cors = require('cors')
 const Mutex = require('async-mutex').Mutex;
 const {EventEmitter, once } = require('node:events');
 const { assert } = require('node:console');
+const cors = require('cors')
 
 const {categories} = require('./categories')
 
 const app = express()
-const port = 10201
+const port = 8080 
 
 const MILLI_SECONDS_PER_MINUTE = 60_000
 const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
 const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
-const MAX_ROUNDS = 2
+const MAX_ROUNDS = 20
 const jsonParser = bodyParser.json()
 
 const firebaseConfig = {
@@ -40,7 +39,7 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
-findPartnerEmitter.setMaxListeners(1)
+//findPartnerEmitter.setMaxListeners(1)
 gameOverEmitter.setMaxListeners(0)
 
 app.use(cookieParser())
@@ -58,7 +57,18 @@ async function isRegisteredPlayer(player)
   const players = db.collection("players/").where("uid", '==', player)
   const player_data = await players.get()
 
-  return player_data.docs.length !== 0
+  if (player_data.docs.length === 0)
+  {
+    return false
+  }
+  else if (player_data.docs.length === 1)
+  {
+    return player_data.docs[0].get('game_state') === 'IN_ROOM'
+  }
+  else
+  {
+    throw {code: 500, msg: "Player was found in multiple documents in the server."}
+  }
 }
 
 async function getPlayerChatroomName(player)
@@ -235,13 +245,19 @@ function registerRoomCallbacks(roomId, expiryTime)
     }
   })
 
-  // TODO: uncomment this when we have delete player functionality. 
   const unsubDeleteRoom = roomFieldsRef.onSnapshot(async (snapshot) => {
     const numGone = snapshot.get("num_disconnected")
     if (numGone === 2)
     {
-      console.log("deleting the chatroom now")
       unsubDeleteRoom()
+
+      const batch = db.batch()
+      const messagesRef = await db.collection(`chat-room/${roomId}/messages`).get()
+      messagesRef.docs.forEach((message) => {
+        batch.delete(message.ref)
+      })
+      batch.delete(snapshot.ref)
+      await batch.commit()
     }
   })
 
@@ -471,9 +487,17 @@ app.get('/api/chat-info', (req, res) => {
   }
 
   auth.verifyIdToken(req.cookies.auth_token).then(async (decoded) => {
-    const registered = await isRegisteredPlayer(decoded.uid)
-    // TODO: make sure isRegisteredPlayer also ensures the player is part of a chatroom
-    // i.e. their chatroom field is present, and they have not left the room
+
+    let registered
+
+    try {
+      registered = await isRegisteredPlayer(decoded.uid)
+    }
+    catch (error)
+    {
+      res.statusCode = error.code || 500
+      res.send(error.msg || 'Server Error')
+    }
 
     if (!registered)
     {
@@ -710,8 +734,6 @@ app.get('/api/unregister-player', (req, res) => {
       res.send("Player is part of many chatrooms")
       return
     }
-
-    // TODO: make sure the room is not dead. If the room is dead the PLAYER IS NOT ALLOWED TO LEAVE 
 
     const roomName = playerData.docs[0].get("room")
 

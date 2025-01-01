@@ -140,7 +140,7 @@ function Chat() {
       return
     }
 
-    const evtSource = new EventSource("http://localhost:10201/api/get-chatroom-messages");
+    const evtSource = new EventSource("http://localhost:8080/api/get-chatroom-messages");
 
     evtSource.addEventListener("message", (alert) => {
 
