@@ -189,6 +189,13 @@
   background-color: gold;
 }
 
+.chat-message-server-first-bold {
+  margin-left : 1rem;
+  margin-right : auto;
+  background-color: gold;
+  font-weight: 800;
+}
+
 .chat-message-server {
   margin-left : auto;
   margin-right : auto;

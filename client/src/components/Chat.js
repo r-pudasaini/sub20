@@ -6,7 +6,6 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Chatroom } from "../contexts/ChatroomContext";
 import { Login } from "../contexts/LoginContext";
-import {jwtDecode} from 'jwt-decode'
 import Countdown from 'react-countdown';
 import HowToPlayPopup from "./HowToPlayPopup";
 import Confetti from 'react-confetti'
@@ -23,34 +22,32 @@ const placeholders = {
   "DEAD":"room is dead. Thanks for playing!"
 }
 
-
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
-  const {loginCookie} = useContext(Login)
+  const {userDetails} = useContext(Login)
 
   const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
   const [allMessages, setAllMessages] = useState( (chatDetails.messages || []).sort( (m1, m2) => m2.time - m1.time))  // an array of all the messages in the room 
   const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
-
+  const [countdownTime, setCountdownTime] = useState(chatDetails.expiresAt || 0)
 
   const [message, setMessage] = useState("")  // the message as we type it 
-  const [userInfo, setUserInfo] = useState({})  // information of the logged in user according to the login cookie
   const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
   const [popup, setPopup] = useState(false) // the rules popup 
 
   useEffect(() => {
 
-    setChatDetails({...chatDetails, messages: allMessages, state: roomState, transitMessage: copyMessage})
+    setChatDetails({...chatDetails, messages: allMessages, state: roomState, transitMessage: copyMessage, expiresAt:countdownTime})
 
-  }, [roomState, allMessages, setChatDetails, copyMessage])
+  }, [roomState, allMessages, setChatDetails, copyMessage, countdownTime])
 
   const navigate = useNavigate()
 
 
   const getMessageType = (uid) => {
 
-    if (uid === userInfo.sub)
+    if (uid === userDetails.sub)
     {
       return "chat-message-me"
     }
@@ -61,6 +58,10 @@ function Chat() {
     else if (uid === "server-first")
     {
       return "chat-message-server-first"
+    }
+    else if (uid === 'server-first-category')
+    {
+      return 'chat-message-server-first-bold'
     }
     return "chat-message-other"
   }
@@ -145,19 +146,10 @@ function Chat() {
 
   useEffect(() => {
 
-    if (!loginCookie)
-    {
-      navigate('/error/401')
-      return
-    }
 
-    try {
-      const result = jwtDecode(loginCookie)
-      setUserInfo(result)
-
-    } catch (error)
+    if (!userDetails)
     {
-      navigate('error/401')
+      //navigate('/error/401')
       return
     }
 
@@ -195,6 +187,12 @@ function Chat() {
         evtSource.close()
         return
       }
+      else if (alert.data.startsWith('extra time/'))
+      {
+        const expirationTime = parseInt(alert.data.substring('extra time/'.length))
+        setCountdownTime(expirationTime)
+        return
+      }
 
       const incomingArr = JSON.parse(alert.data)
 
@@ -210,7 +208,7 @@ function Chat() {
       evtSource.close()
     }
 
-  }, [loginCookie, navigate])
+  }, [userDetails, navigate])
 
   const handleSubmit = (e) => {
 
@@ -293,7 +291,7 @@ function Chat() {
               <div>Time Left:</div>
               {
                 roomState !== ChatStates.DEAD && 
-                <Countdown date={chatDetails.expiresAt} />
+                <Countdown date={countdownTime} />
               }
               {
                 roomState === ChatStates.DEAD && 
@@ -380,7 +378,7 @@ function Chat() {
         roomState === ChatStates.PENDING && 
         <div className="flex-col center-contents-horizontal center-text">
           <div className="jersey-15 chat-side-text-neutral">
-            Your message: 
+            Your Message: 
           </div>
           <div className="jersey-15 chat-side-text-guess">
             {copyMessage}

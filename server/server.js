@@ -11,14 +11,14 @@ const {EventEmitter, once } = require('node:events');
 const { assert } = require('node:console');
 const cors = require('cors')
 
-const {categories} = require('./categories')
+const {categories} = require('./categories');
 
 const app = express()
-const port = 8080 
+const port = parseInt(process.env.PORT) || 8080;
 
-const MILLI_SECONDS_PER_MINUTE = 60_000
-const DEFAULT_CHAT_TIME = 10 * MILLI_SECONDS_PER_MINUTE
-const HEARTBEAT_DELAY = MILLI_SECONDS_PER_MINUTE / 4
+const MILLI_SECONDS_PER_SECOND = 1_000
+const DEFAULT_CHAT_TIME = 20 * MILLI_SECONDS_PER_SECOND
+const HEARTBEAT_DELAY = (MILLI_SECONDS_PER_SECOND * 60) / 4
 const MAX_ROUNDS = 20
 const jsonParser = bodyParser.json()
 
@@ -39,6 +39,7 @@ const db = getFirestore(fApp)
 const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
+const timeoutEmitter = new EventEmitter()
 //findPartnerEmitter.setMaxListeners(1)
 gameOverEmitter.setMaxListeners(0)
 
@@ -169,13 +170,30 @@ function registerRoomCallbacks(roomId, expiryTime)
   const roomFieldsRef = db.doc(`chat-room/${roomId}`)
   const messagesRef = db.collection(`chat-room/${roomId}/messages`)
 
-  const timeoutId = setTimeout(async () => {
-
-    await roomFieldsRef.update({
-      room_death_message: "Defeat: Ran out of time"
-    })  // this will trigger the snapshot below: 
-
+  setTimeout(() => {
+    timeoutEmitter.emit(`${roomId}/time-out`)
   }, expiryTime - Date.now())
+
+  timeoutEmitter.on(`${roomId}/time-out`, async () => {
+
+    const roomFields = await roomFieldsRef.get()
+    const expiry = roomFields.get('expiry_time')
+    const now = Date.now()
+
+    if (now > expiry)
+    {
+      roomFieldsRef.update({
+        room_death_message : 'Defeat: Ran out of time.'
+      })
+    }
+    else
+    {
+      setTimeout(() => {
+        timeoutEmitter.emit(`${roomId}/time-out`)
+      }, expiry - now)
+    }
+
+  })
 
   const unsubUpdateMessage = roomFieldsRef.onSnapshot(async (snapshot) => {
 
@@ -187,11 +205,6 @@ function registerRoomCallbacks(roomId, expiryTime)
 
     if (deathMessage)
     {
-      //await messagesRef.add({
-      //  text: deathMessage,
-      //  user: "server-first",
-      //  time: GAME_END_MESSAGE_TIME
-      //})
       gameOverEmitter.emit(`${roomId}/game-over`, deathMessage)
       return
     }
@@ -203,25 +216,22 @@ function registerRoomCallbacks(roomId, expiryTime)
       if (updatedTransitArray[0].text.toLocaleLowerCase() === updatedTransitArray[1].text.toLocaleLowerCase())
       {
         roomDeathMessage = "Victory!"
-        clearTimeout(timeoutId)
       }
       else if (roundVal >= MAX_ROUNDS)
       {
         roomDeathMessage = "Defeat: Out of rounds"
-        clearTimeout(timeoutId)
       }
       else if (Date.now() > expiresAt)
       {
-        // no need to do anything, as the timeout function should have fired, and 
-        // therefore prevent any more messages from being sent to the database, or other 
-        // clients from reading any more messages. 
-        // this code-block is mostly just a sanity check. 
         return
       }
 
       await messagesRef.add(updatedTransitArray[0])
       updatedTransitArray[1].time++
       await messagesRef.add(updatedTransitArray[1])
+
+      const newExpiry = Date.now() + DEFAULT_CHAT_TIME
+      gameOverEmitter.emit(`${roomId}/extra-time`, newExpiry)
 
       if (!roomDeathMessage)
       {
@@ -235,13 +245,14 @@ function registerRoomCallbacks(roomId, expiryTime)
       await db.doc(`chat-room/${roomId}`).update({
         transit_messages: [],
         round : FieldValue.increment(1),
-        room_death_message : roomDeathMessage
+        room_death_message : roomDeathMessage,
+        expiry_time : newExpiry
       })
 
-      if (roomDeathMessage)
-      {
-        gameOverEmitter.emit(`${roomId}/game-over`, roomDeathMessage)
-      }
+      //if (roomDeathMessage)
+      //{
+      //  gameOverEmitter.emit(`${roomId}/game-over`, roomDeathMessage)
+      //}
     }
   })
 
@@ -263,6 +274,7 @@ function registerRoomCallbacks(roomId, expiryTime)
 
   gameOverEmitter.once(`${roomId}/game-over`, () => {
     unsubUpdateMessage()
+    timeoutEmitter.removeAllListeners(`${roomId}/time-out`)
   })
 
 }
@@ -342,6 +354,10 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 
     })
 
+    gameOverEmitter.on(`${roomName}/extra-time`, (time) => {
+      res.write(`data: extra time/${time}\n\n`)
+    })
+
     const heartbeatId = setInterval(() => {
       res.write("data: []\n\n")
     }, HEARTBEAT_DELAY)
@@ -356,11 +372,13 @@ app.get('/api/get-chatroom-messages', (req, res) => {
 
     req.on("close", () => {
       gameOverEmitter.removeListener(`${roomName}/game-over`, terminateConnection)
+      gameOverEmitter.removeAllListeners(`${roomName}/extra-time`)
       unsub()
     })
 
     req.on("end", () => {
       gameOverEmitter.removeListener(`${roomName}/game-over`, terminateConnection)
+      gameOverEmitter.removeAllListeners(`${roomName}/extra-time`)
       unsub()
     })
 
@@ -623,16 +641,23 @@ app.get('/api/start-game', (req, res) => {
           game_state : "IN_ROOM",
         })
 
+
         await db.collection(`chat-room/${rv.id}/messages`).add({
-          text: `Welcome to Sub 20! Your category is ${category}, you have 10 minutes and 20 chances to send the same message as your partner. Good Luck!`,
+          text: 'Welcome to Sub 20! you have 20 rounds to send the same message as your partner. Each round you have 20 seconds to send a message. Your category is:',
           user: "server-first",
           time: 1
         })
 
         await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: `${category}`,
+          user: "server-first-category",
+          time: 2
+        })
+
+        await db.collection(`chat-room/${rv.id}/messages`).add({
           text: 'Round 1',
           user: "server",
-          time: 2
+          time: 3
         })
 
         registerRoomCallbacks(rv.id, expiryTime)
