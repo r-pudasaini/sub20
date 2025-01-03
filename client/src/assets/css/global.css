@@ -2,10 +2,12 @@
 :root {
   --font-family : "Georgia", sans-serif;
   --vim-red : #c33f42;
+  --background-color : #181616;
 }
 
 body {
-  background : #181616;
+  background-color: var(--background-color);
+  color : white;
 }
 
 .center-text {
@@ -57,18 +59,31 @@ a {
   user-select: none;
 }
 
+.jersey-15 {
+  font-family: "Jersey 15", sans-serif;
+}
+
 .jersey-15-regular {
   font-family: "Jersey 15", sans-serif;
   font-weight: 400;
   font-style: normal;
 }
 
+.jersey-15-large {
+  font-family: "Jersey 15", sans-serif;
+  font-style: normal;
+  font-size: 34px;
+}
 
 .pixelify-sans-regular {
   font-family: "Pixelify Sans", sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
+}
+
+.title-font {
+  font-family: "Proza Libre", serif;
 }
 
 .button:hover {

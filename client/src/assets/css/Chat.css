@@ -1,0 +1,261 @@
+
+.chat-top-container > * {
+  margin-left : auto;
+  margin-right: auto;
+}
+
+.chat-body {
+  border: 1px solid white;
+  border-radius: 10px;
+  margin-top : 1rem;
+  margin-bottom : 0.5rem;
+  width: 100%;
+}
+
+.chat-header {
+  padding: 1rem;
+  height: fit-content;
+  border-radius: 10px 10px 0 0;
+  color : #F0EDEE;
+  font-weight: bold;
+  background-color: #2d3142;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.chat-side-text-neutral {
+
+  font-size: 38px;
+  color : gold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width : 10vw;
+  text-align: center;
+  word-wrap: break-word;
+}
+
+::placeholder {
+  color : #333333;
+}
+
+.chat-game-end {
+  padding : 2rem 5rem !important;
+  margin-top : 30vh;
+  justify-content: center;
+  font-size: large;
+}
+
+.chat-toast-contents {
+  color : black;
+  font-size : 32px;
+  text-align: center;
+
+}
+
+.chat-input {
+  background-color: white;
+}
+
+.chat-input:disabled {
+  background-color: #a3a3a3;
+}
+
+.chat-side-text-guess {
+  font-size: 28px;
+  width: 10vw;
+  word-wrap: break-word;
+
+}
+
+.chat-side-text-positive {
+
+  font-size: 38px;
+  color : lime;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width : 10vw;
+  text-align: center;
+}
+
+.chat-partner-info {
+  margin-right: auto;
+}
+
+.chat-container {
+  width : 60vw;
+}
+
+.chat-rules-popup {
+  color : gray;
+  margin-bottom : 2rem;
+  text-decoration: underline;
+}
+
+.chat-rules-popup:hover {
+  cursor: pointer;
+}
+
+.chat-countdown {
+  margin-left: auto;
+  text-align: center;
+}
+
+.chat-message-window {
+  margin-top : 1rem;
+  margin-bottom : 0.5rem;
+  height : 75vh;
+  width : 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.chat-leave {
+  background-color: var(--vim-red);
+  font-size: 23px;
+  padding : 0.5rem 1.5rem;
+  color : white;
+  text-align: center;
+  word-wrap: break-word;
+  border-radius: 10px;
+  width: fit-content;
+  margin-left : auto;
+  margin-right : 2rem;
+  margin-top : 1rem;
+  margin-bottom : 2rem;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+}
+
+.chat-play-again {
+  background-color:lime;
+  font-size: 23px;
+  padding : 0.5rem 1.5rem;
+  color : black;
+  text-align: center;
+  word-wrap: break-word;
+  border-radius: 10px;
+  width: fit-content;
+  margin-left : 2rem;
+  margin-right : auto;
+  margin-top : 1rem;
+  margin-bottom : 2rem;
+  box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.6);
+}
+
+.chat-play-again:hover {
+  filter: brightness(80%);
+}
+
+.chat-message-window:first-child {
+  padding-top : 0.5rem;
+}
+
+.chat-form {
+  width : 100%;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: row;
+}
+
+.chat-message-element {
+  color : black;
+  width: fit-content;
+  max-width: 40%;
+  word-wrap: break-word;
+  padding : 0.5rem;
+  margin-bottom : 0.5rem;
+  border-radius: 10px;
+}
+
+.chat-message-me {
+  margin-left : auto;
+  margin-right : 1rem;
+  background-color: white;
+
+}
+
+.chat-message-other {
+  margin-left : 1rem;
+  margin-right : auto;
+  background-color: #808080;
+}
+
+.chat-message-server-first {
+  margin-left : 1rem;
+  margin-right : auto;
+  background-color: gold;
+}
+
+.chat-message-server-first-bold {
+  margin-left : 1rem;
+  margin-right : auto;
+  background-color: gold;
+  font-weight: 800;
+}
+
+.chat-message-server {
+  margin-left : auto;
+  margin-right : auto;
+  background-color: rgba(0,0,0,0.5);
+  color: white;
+  width : 90%;
+  max-width: 90%;
+  text-align: center;
+}
+
+
+.chat-button:hover {
+  cursor: pointer;
+}
+
+
+.chat-form > * {
+  border: 0;
+  padding : 0.5rem;
+}
+
+.chat-form input {
+  flex-grow: 1;
+  border-radius: 10px 0 0px 10px;
+  outline: none;
+}
+
+.chat-form button {
+  width : 4rem;
+  border-radius: 0 10px 10px 0;
+}
+
+@media (max-width : 900px) {
+  .chat-side-text-neutral {
+    display: none;
+  }
+  .chat-side-text-positive {
+    display: none;
+  }
+  .chat-side-text-guess {
+    display: none;
+  }
+}
+
+@media (max-width : 500px) {
+
+  .chat-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .chat-partner-info {
+    margin-left : auto;
+    margin-right: auto;
+    margin-bottom : 1rem;
+  }
+
+  .chat-countdown {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+}

@@ -1,24 +1,31 @@
 {
   "name": "client",
   "version": "0.1.0",
+  "proxy": "http://localhost:8080",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "axios": "^1.7.8",
+    "axios": "^1.7.9",
+    "firebase": "^11.1.0",
+    "jwt-decode": "^4.0.0",
     "react": "^18.3.1",
+    "react-confetti": "^6.2.2",
+    "react-countdown": "^2.3.6",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.0.1",
     "react-scripts": "5.0.1",
     "react-spinners": "^0.14.1",
+    "react-toastify": "^11.0.0",
+    "universal-cookie": "^7.2.2",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "start": "react-scripts start",
-    "build": "BUILD_PATH='../webapp/' react-scripts build",
+    "build": "BUILD_PATH='../server/webapp/' react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

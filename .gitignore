@@ -2,3 +2,10 @@
 Cargo.lock
 /webapp
 .DS_Store
+/server/node_modules
+/server/package-lock.json
+/server/firebase-config.js
+/server/.env
+/server/private_key.json
+/server/categories.js
+/server/webapp
