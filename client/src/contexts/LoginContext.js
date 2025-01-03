@@ -26,7 +26,7 @@ function LoginContext ({children}) {
     try {
       const ud = jwtDecode(loginCookie)
 
-      console.log(ud)
+      //console.log(ud)
 
       if (!ud.exp)
       {
@@ -39,7 +39,6 @@ function LoginContext ({children}) {
 
       if (Date.now() > ud.exp * 1000)
       {
-        console.log("expired cookie")
         throw Error("expired")
       }
 
