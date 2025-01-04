@@ -26,7 +26,7 @@ function HowToPlayPopup({isActive, setState}) {
         'When a partner is found, you should see an chatroom in front of you. You are trying to send the same message as them',
         'Your messages are white, your partner\'s messages are grey, and server messages are yellow',
         'The first message in each chatroom is your assigned category. Send messages that belong to your category',
-        'You can only send one word at a time, alphabet characters only, non-empty messages, messages distinct from others previously submitted. 20 rounds to send the same message, and 20 seconds in each round to send one.',
+        'You can only send up to 2 words at a time, alphabet characters only, non-empty messages, messages distinct from others previously submitted, 50 characters max, 20 rounds to send the same message, and 20 seconds in each round to send one.',
     ]
 
     const leftPress = () => {
