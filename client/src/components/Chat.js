@@ -22,6 +22,7 @@ const placeholders = {
   "DEAD":"room is dead. Thanks for playing!"
 }
 
+
 function Chat() {
 
   const {chatDetails, setChatDetails} = useContext(Chatroom)
@@ -35,6 +36,51 @@ function Chat() {
   const [message, setMessage] = useState("")  // the message as we type it 
   const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
   const [popup, setPopup] = useState(false) // the rules popup 
+
+  const verifyMessage = (message) => {
+
+    if (message.length === 0)
+    {
+      return "Message must not be empty"
+    }
+
+    if (message.length > 50)
+    {
+      return "Message must not be longer than 50 characters" 
+    }
+
+    const alphabet = 'abcdefghijklmnopqrstuvwxyzQWERTYUIOPASDFGHJKLZXCVBNM'.split('');
+    let space = false
+
+    for (let char of message)
+    {
+      if (char === ' ')
+      {
+        if (space)
+        {
+          return "Message must not have more than one space"
+        }
+        space = true
+        continue;
+      }
+
+      if (!alphabet.includes(char))
+      {
+        return "Invalid character found in message"
+      }
+    }
+
+    let lowercaseArr = allMessages.map((msg) => {
+      return msg.text.toLocaleLowerCase()
+    })
+
+    if (lowercaseArr.includes(message.toLocaleLowerCase()))
+    {
+      return `${message} has already been sent` 
+    }
+
+    return ""
+  }
 
   useEffect(() => {
 
@@ -66,30 +112,6 @@ function Chat() {
     return "chat-message-other"
   }
 
-  const isValidMessage = (str) => {
-
-    // one word, non-empty, a non-duplicate, ascii chars only.
-
-    if (typeof(str) === "undefined" || str === "")
-    {
-      return "Message is empty"
-    }
-
-    if (!(/^[a-zA-Z]+$/.test(str)))
-    {
-      return `Invalid Characters in ${str}. See Rules`
-    }
-
-    let lowercaseArr = allMessages.map((msg) => {
-      return msg.text.toLocaleLowerCase()
-    })
-
-    if (lowercaseArr.includes(str.toLocaleLowerCase()))
-    {
-      return `${str} has already been sent` 
-    }
-  }
-
   const sortAndSetMessages = (messageArray) => {
 
     messageArray.sort((m1, m2) => {
@@ -114,6 +136,7 @@ function Chat() {
       }
       else
       {
+
         toast.error("Failed to connect. Check console for details")
         console.log(error)
         navigate('/')
@@ -221,17 +244,19 @@ function Chat() {
 
     const dup = String(message)
 
-    const errorMessage = isValidMessage(dup)
-    setCopyMessage(dup)
+    const errorMessage = verifyMessage(dup)
 
     if (errorMessage)
     {
-      toast.error(`${errorMessage}`)
+      toast.dismiss()
+      toast.error(`${errorMessage}`, {autoClose: false})
       return;
     }
 
+    setCopyMessage(dup)
     axios.post('/api/send-chatroom-message', {"message":dup}).then((_) => {
 
+      toast.dismiss()
       setMessage("")
       setRoomState(ChatStates.PENDING)
 

@@ -395,28 +395,43 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
 
   const isValidMessage = (str, existingMessages) => {
 
-    // one word, non-empty, a non-duplicate, ascii chars only.
-
-    if (typeof(str) !== "string")
+    if (str.length === 0)
     {
-      return `Error: Wrong data type passed. Expected string, got ${typeof(str)}`
+      return "Message must not be empty"
     }
 
-    if (str === "")
+    if (str.length > 50)
     {
-      return "Error: Message must not be empty";
+      return "Message must not be longer than 50 characters" 
     }
 
-    if (!(/^[a-zA-Z]+$/.test(str)))
+    const alphabet = 'abcdefghijklmnopqrstuvwxyzQWERTYUIOPASDFGHJKLZXCVBNM'.split('');
+    let space = false
+
+    for (let char of str)
     {
-      return "Error: Invalid Character Detected in Message";
+      if (char === ' ')
+      {
+        if (space)
+        {
+          return "Message must not have more than one space"
+        }
+        space = true
+        continue;
+      }
+
+      if (!alphabet.find(letter => letter === char))
+      {
+        return "Invalid character found in message"
+      }
     }
 
     if (existingMessages.includes(str.toLocaleLowerCase()))
     {
-      return `Error: ${str} already exists`
+      return `${str} has already been sent` 
     }
 
+    return ""
   }
 
   if (typeof(req.cookies.auth_token) === "undefined")
