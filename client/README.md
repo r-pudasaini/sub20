@@ -1,1 +1,2 @@
-The source code of Riyos Pudasaini's (second) personal website
+The source code for the Client Side of Sub 20.
+
