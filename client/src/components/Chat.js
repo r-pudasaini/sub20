@@ -6,7 +6,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Chatroom } from "../contexts/ChatroomContext";
 import { Login } from "../contexts/LoginContext";
-import Countdown from 'react-countdown';
+import Countdown, {zeroPad} from 'react-countdown';
 import HowToPlayPopup from "./HowToPlayPopup";
 import Confetti from 'react-confetti'
 
@@ -31,7 +31,7 @@ function Chat() {
   const [copyMessage, setCopyMessage] = useState(chatDetails.transitMessage || "")  // a copy message which is displayed for the user
   const [allMessages, setAllMessages] = useState( (chatDetails.messages || []).sort( (m1, m2) => m2.time - m1.time))  // an array of all the messages in the room 
   const [roomState, setRoomState] = useState(chatDetails.state || "YOUR_TURN") // the state of the room right now (our turn, waiting for partner, or game over)
-  const [countdownTime, setCountdownTime] = useState(chatDetails.expiresAt || 0)
+  const [countdownTime, setCountdownTime] = useState(chatDetails.expiresAt || Date.now() + 20000)
 
   const [message, setMessage] = useState("")  // the message as we type it 
   const [victory, setVictory] = useState(false) // whether we won or not to display some confetti 
@@ -172,7 +172,7 @@ function Chat() {
 
     if (!userDetails)
     {
-      //navigate('/error/401')
+      navigate('/error/401')
       return
     }
 
@@ -186,7 +186,7 @@ function Chat() {
 
       if (alert.data === '[]')
       {
-        // heartbeat data to ensure the connection lives over 10 minutes 
+        // heartbeat data to ensure the connection lives over periods of inactivity
         return
       }
       else if (alert.data.startsWith('game over/'))
@@ -286,6 +286,27 @@ function Chat() {
     return roomState === ChatStates.YOUR_TURN ? "chat-button" : ""
   }
 
+  const getColor = (seconds) => {
+    if (seconds > 10)
+    {
+      return "green"
+    }
+    else if (seconds > 5)
+    {
+      return "yellow"
+    }
+    else
+    {
+      return "red"
+    }
+  }
+
+  const renderer = ({minutes, seconds}) => (
+    <span className={getColor(seconds)}>
+      {zeroPad(minutes)}:{zeroPad(seconds)}
+    </span>
+  )
+
   return (
     <div className="chat-top-container flex-row">
 
@@ -316,7 +337,7 @@ function Chat() {
               <div>Time Left:</div>
               {
                 roomState !== ChatStates.DEAD && 
-                <Countdown date={countdownTime} />
+                <Countdown date={countdownTime} renderer={renderer}/>
               }
               {
                 roomState === ChatStates.DEAD && 

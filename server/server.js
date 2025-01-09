@@ -11,7 +11,7 @@ const {EventEmitter, once } = require('node:events');
 const { assert } = require('node:console');
 const cors = require('cors')
 
-const {categories} = require('./categories');
+const {categories, getBotMessage} = require('./categories');
 
 const app = express()
 const port = parseInt(process.env.PORT) || 8080;
@@ -19,6 +19,7 @@ const port = parseInt(process.env.PORT) || 8080;
 const MILLI_SECONDS_PER_SECOND = 1_000
 const DEFAULT_CHAT_TIME = 20 * MILLI_SECONDS_PER_SECOND
 const HEARTBEAT_DELAY = (MILLI_SECONDS_PER_SECOND * 60) / 4
+const PARTNER_NOT_FOUND_TIMEOUT = DEFAULT_CHAT_TIME / 2
 const MAX_ROUNDS = 20
 const jsonParser = bodyParser.json()
 
@@ -40,7 +41,6 @@ const emitterLock = new Mutex()
 const findPartnerEmitter = new EventEmitter()
 const gameOverEmitter = new EventEmitter()
 const timeoutEmitter = new EventEmitter()
-//findPartnerEmitter.setMaxListeners(1)
 gameOverEmitter.setMaxListeners(0)
 
 app.use(cookieParser())
@@ -495,35 +495,6 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       return
     }
 
-
-    if (chatRef.get("bot_room"))
-    {
-      // this is a bot room. thus, we will compute a bot message, 
-      // for now, it will be exactly the same message the user sent. 
-
-      const botMessage = String(message2send)
-      // const botMessage = getBotMessage(message2send, existingMessages, chatRef.get("category"), roundVal)
-      
-      await roomFieldsRef.update({
-        transit_messages : [
-          {
-            text : message2send,
-            time : roundVal * 10,
-            user: decoded.uid
-          },
-          {
-            text : botMessage,
-            time : roundVal * 10,
-            user : 'server-bot'
-          }
-        ]
-      })
-
-      res.statusCode = 200
-      res.send("")
-      return
-    }
-
     const earlierMessage = chatRef.get("transit_messages").find((value) => {
       return value.user === decoded.uid
     })
@@ -532,6 +503,43 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
     {
       res.statusCode = 400
       res.send(`You already sent a message for round ${roundVal}`)
+      return
+    }
+
+    if (chatRef.get("bot_room"))
+    {
+      let botMessage
+      const delay = Math.floor(Math.random() * ( chatRef.get("expiry_time") - Date.now() ) / 4)
+      // delay for at most a quarter of the time left 
+
+      try 
+      {
+        botMessage = getBotMessage(message2send, existingMessages, chatRef.get("category"), roundVal)
+      }
+      catch (error)
+      {
+        res.statusCode = error.code
+        res.send(error.msg)
+        return
+      }
+      
+      await roomFieldsRef.update({
+        transit_messages: FieldValue.arrayUnion({text:message2send, time:roundVal * 10, user:decoded.uid})
+      })
+      
+      setTimeout(async () => {
+        await roomFieldsRef.update({
+          transit_messages : FieldValue.arrayUnion({
+            text : botMessage,
+            time : roundVal * 10,
+            user : 'server-bot'
+          })
+        })
+      }, delay)
+
+      res.statusCode = 200
+      res.send("")
+
       return
     }
 
@@ -695,7 +703,7 @@ app.get('/api/start-game', (req, res) => {
 
           timedRelease()
 
-        }, DEFAULT_CHAT_TIME / 2)
+        }, PARTNER_NOT_FOUND_TIMEOUT)
 
         req.on("close", () => clearTimeout(partnerNotFoundTimeout))
         release()
@@ -832,7 +840,7 @@ app.get('/api/start-game', (req, res) => {
 
         timedRelease()
 
-      }, DEFAULT_CHAT_TIME / 2)
+      }, PARTNER_NOT_FOUND_TIMEOUT)
 
       req.on("close", () => clearTimeout(partnerNotFoundTimeout))
 

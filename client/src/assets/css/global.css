@@ -90,3 +90,15 @@ a {
   filter: brightness(110%);
   cursor: pointer;
 }
+
+.red {
+  color : var(--vim-red);
+}
+
+.yellow {
+  color : gold;
+}
+
+.green {
+  color : limegreen;
+}
