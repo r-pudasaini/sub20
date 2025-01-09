@@ -691,12 +691,13 @@ app.get('/api/start-game', (req, res) => {
 
           registerRoomCallbacks(rv.id, expiryTime)
           const partnerWasWaiting = findPartnerEmitter.emit("find-partner", rv.id, "Server Bot", 'anonymous', category, expiryTime)
-          assert(partnerWasWaiting && "Error: Expected there to be a partner waiting for us, or for this timeout to be cancelled")
+          assert(partnerWasWaiting, "Error: Expected there to be a partner waiting for us, or for this timeout to be cancelled")
 
           timedRelease()
 
         }, DEFAULT_CHAT_TIME / 2)
 
+        req.on("close", () => clearTimeout(partnerNotFoundTimeout))
         release()
         const partnerArgs = await partnerFound 
         clearTimeout(partnerNotFoundTimeout)
@@ -789,6 +790,52 @@ app.get('/api/start-game', (req, res) => {
       assert(findPartnerEmitter.listenerCount('find-partner') === 1, "Error, expected exactly one listener in find partner.")
       findPartnerEmitter.removeAllListeners('find-partner')
       const partnerFound = once(findPartnerEmitter, "find-partner")
+
+      const partnerNotFoundTimeout = setTimeout(async () => {
+        const timedRelease = await emitterLock.acquire()
+
+        const category = getRandomCategory()
+        const expiryTime = Date.now() + DEFAULT_CHAT_TIME
+
+        const rv = await db.collection("chat-room").add({
+          round: 1, 
+          transit_messages: [],
+          players: ["server-bot"],
+          expiry_time : expiryTime,
+          category,
+          room_death_message: "",
+          num_disconnected : 0,
+          bot_room : true,
+        })
+
+        await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: 'Welcome to Sub 20! you have 20 rounds to send the same message as your partner. Each round you have 20 seconds to send a message. Your category is:',
+          user: "server-first",
+          time: 1
+        })
+
+        await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: `${category}`,
+          user: "server-first-category",
+          time: 2
+        })
+
+        await db.collection(`chat-room/${rv.id}/messages`).add({
+          text: 'Round 1',
+          user: "server",
+          time: 3
+        })
+
+        registerRoomCallbacks(rv.id, expiryTime)
+        const partnerWasWaiting = findPartnerEmitter.emit("find-partner", rv.id, "Server Bot", 'anonymous', category, expiryTime)
+        assert(partnerWasWaiting, "Error: Expected there to be a partner waiting for us, or for this timeout to be cancelled")
+
+        timedRelease()
+
+      }, DEFAULT_CHAT_TIME / 2)
+
+      req.on("close", () => clearTimeout(partnerNotFoundTimeout))
+
       release()
       const partnerArgs = await partnerFound 
 
