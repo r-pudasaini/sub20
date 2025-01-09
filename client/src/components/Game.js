@@ -46,8 +46,13 @@ function Game() {
         />
       </div>
 
-      <div className='game-state-text jersey-15-regular'>
-        Searching for a player...
+      <div className='game-state-text jersey-15-regular flex-col'>
+        <div>
+          Searching for a player...
+        </div>
+        <div>
+          If no player is found in 10 seconds, you will play with a bot. 
+        </div>
       </div>
 
     </div>

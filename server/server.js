@@ -146,10 +146,22 @@ async function getChatInfoOfPlayer(playerUID)
 
   assert(partnerUID, "Error expected partnerName to be a defined value")
 
+  if (partnerUID === 'server-bot')
+  {
+    return {
+      name: "Server Bot",
+      email: "anonymous",
+      category:roomData.get('category'),
+      expiresAt:roomData.get('expiry_time'),
+      state,
+      transitMessage,
+      messages
+    }
+  }
+
   const partnerDocs = await db.collection('players').where("uid", "==", partnerUID).get()
 
   assert(partnerDocs.docs.length === 1, "Expected exactly one partner to be available")
-
 
   const partnerName = partnerDocs.docs[0].get("name")
   const partnerEmail = partnerDocs.docs[0].get("email")
@@ -249,16 +261,13 @@ function registerRoomCallbacks(roomId, expiryTime)
         expiry_time : newExpiry
       })
 
-      //if (roomDeathMessage)
-      //{
-      //  gameOverEmitter.emit(`${roomId}/game-over`, roomDeathMessage)
-      //}
     }
   })
 
   const unsubDeleteRoom = roomFieldsRef.onSnapshot(async (snapshot) => {
     const numGone = snapshot.get("num_disconnected")
-    if (numGone === 2)
+    const isBotRoom = snapshot.get("bot_room")
+    if (numGone === 2 || (numGone === 1 && isBotRoom))
     {
       unsubDeleteRoom()
 
@@ -486,6 +495,35 @@ app.post('/api/send-chatroom-message', jsonParser, (req, res) => {
       return
     }
 
+
+    if (chatRef.get("bot_room"))
+    {
+      // this is a bot room. thus, we will compute a bot message, 
+      // for now, it will be exactly the same message the user sent. 
+
+      const botMessage = String(message2send)
+      // const botMessage = getBotMessage(message2send, existingMessages, chatRef.get("category"), roundVal)
+      
+      await roomFieldsRef.update({
+        transit_messages : [
+          {
+            text : message2send,
+            time : roundVal * 10,
+            user: decoded.uid
+          },
+          {
+            text : botMessage,
+            time : roundVal * 10,
+            user : 'server-bot'
+          }
+        ]
+      })
+
+      res.statusCode = 200
+      res.send("")
+      return
+    }
+
     const earlierMessage = chatRef.get("transit_messages").find((value) => {
       return value.user === decoded.uid
     })
@@ -615,8 +653,53 @@ app.get('/api/start-game', (req, res) => {
         })
 
         const partnerFound = once(findPartnerEmitter, "find-partner")
+
+        const partnerNotFoundTimeout = setTimeout(async () => {
+          const timedRelease = await emitterLock.acquire()
+
+          const category = getRandomCategory()
+          const expiryTime = Date.now() + DEFAULT_CHAT_TIME
+
+          const rv = await db.collection("chat-room").add({
+            round: 1, 
+            transit_messages: [],
+            players: ["server-bot"],
+            expiry_time : expiryTime,
+            category,
+            room_death_message: "",
+            num_disconnected : 0,
+            bot_room : true,
+          })
+
+          await db.collection(`chat-room/${rv.id}/messages`).add({
+            text: 'Welcome to Sub 20! you have 20 rounds to send the same message as your partner. Each round you have 20 seconds to send a message. Your category is:',
+            user: "server-first",
+            time: 1
+          })
+
+          await db.collection(`chat-room/${rv.id}/messages`).add({
+            text: `${category}`,
+            user: "server-first-category",
+            time: 2
+          })
+
+          await db.collection(`chat-room/${rv.id}/messages`).add({
+            text: 'Round 1',
+            user: "server",
+            time: 3
+          })
+
+          registerRoomCallbacks(rv.id, expiryTime)
+          const partnerWasWaiting = findPartnerEmitter.emit("find-partner", rv.id, "Server Bot", 'anonymous', category, expiryTime)
+          assert(partnerWasWaiting && "Error: Expected there to be a partner waiting for us, or for this timeout to be cancelled")
+
+          timedRelease()
+
+        }, DEFAULT_CHAT_TIME / 2)
+
         release()
         const partnerArgs = await partnerFound 
+        clearTimeout(partnerNotFoundTimeout)
 
         await db.doc(`chat-room/${partnerArgs[0]}`).update({
           players: FieldValue.arrayUnion(decoded.uid)
